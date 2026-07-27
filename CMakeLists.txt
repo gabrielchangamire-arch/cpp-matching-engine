@@ -24,6 +24,7 @@ endfunction()
 
 add_library(
     matching_engine
+    src/matching_engine.cpp
     src/order_book.cpp
     src/order.cpp
     src/trade.cpp
@@ -74,4 +75,6 @@ if(BUILD_TESTING)
 
     add_matching_engine_test(domain_model_test tests/domain_model_test.cpp)
     add_matching_engine_test(order_book_test tests/order_book_test.cpp)
+    add_matching_engine_test(matching_engine_test tests/matching_engine_test.cpp)
+    add_matching_engine_test(integration_test tests/integration_test.cpp)
 endif()

@@ -148,7 +148,8 @@ std::vector<BookLevel> OrderBook::depth(const Side side,
 
 std::string OrderBook::snapshot() const {
     std::ostringstream output;
-    output << "Order book (" << order_count() << " orders)\n";
+    output << "Order book (" << order_count()
+           << (order_count() == 1 ? " order)\n" : " orders)\n");
 
     output << "ASKS (best first)\n";
     const auto asks = depth(Side::sell);
