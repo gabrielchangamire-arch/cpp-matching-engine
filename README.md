@@ -30,6 +30,18 @@ ctest --test-dir build --output-on-failure
 CTest discovers the GoogleTest domain-model tests individually and reports any
 validation or formatting failure by name.
 
+## Benchmark
+
+Benchmarks are opt-in so normal builds do not fetch Google Benchmark:
+
+```sh
+cmake -S . -B build-release \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DMATCHING_ENGINE_BUILD_BENCHMARKS=ON
+cmake --build build-release --target matching_engine_benchmark --parallel
+./build-release/matching_engine_benchmark
+```
+
 ## Domain representation
 
 Prices use signed 64-bit integer ticks rather than floating point. Quantities

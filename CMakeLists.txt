@@ -9,6 +9,8 @@ project(
 
 find_package(Threads REQUIRED)
 
+option(MATCHING_ENGINE_BUILD_BENCHMARKS "Build Google Benchmark targets" OFF)
+
 function(enable_strict_warnings target_name)
     if(MSVC)
         target_compile_options(${target_name} PRIVATE /W4 /WX)
@@ -94,4 +96,33 @@ if(BUILD_TESTING)
         concurrent_matching_engine_test
         tests/concurrent_matching_engine_test.cpp
     )
+endif()
+
+if(MATCHING_ENGINE_BUILD_BENCHMARKS)
+    include(FetchContent)
+    set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
+    set(BENCHMARK_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
+    FetchContent_Declare(
+        googlebenchmark
+        GIT_REPOSITORY https://github.com/google/benchmark.git
+        GIT_TAG v1.9.5
+        GIT_SHALLOW TRUE
+    )
+    FetchContent_MakeAvailable(googlebenchmark)
+
+    add_executable(
+        matching_engine_benchmark
+        benchmarks/matching_engine_benchmark.cpp
+    )
+    target_link_libraries(
+        matching_engine_benchmark
+        PRIVATE
+            matching_engine
+            benchmark::benchmark
+    )
+    set_target_properties(
+        matching_engine_benchmark
+        PROPERTIES CXX_EXTENSIONS OFF
+    )
+    enable_strict_warnings(matching_engine_benchmark)
 endif()
