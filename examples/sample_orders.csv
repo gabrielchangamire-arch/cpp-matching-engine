@@ -1,0 +1,7 @@
+# ADD,order_id,side,price_ticks,quantity or CANCEL,order_id
+ADD,1,SELL,10100,5
+ADD,2,SELL,10200,7
+ADD,3,BUY,10000,4
+ADD,4,BUY,10300,10
+ADD,5,SELL,9900,6
+CANCEL,2

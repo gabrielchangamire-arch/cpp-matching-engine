@@ -24,6 +24,7 @@ endfunction()
 
 add_library(
     matching_engine
+    src/csv_commands.cpp
     src/matching_engine.cpp
     src/order_book.cpp
     src/order.cpp
@@ -47,6 +48,12 @@ enable_strict_warnings(matching_engine_cli)
 
 include(CTest)
 if(BUILD_TESTING)
+    add_test(
+        NAME cli_sample_test
+        COMMAND matching_engine_cli
+                ${CMAKE_CURRENT_SOURCE_DIR}/examples/sample_orders.csv
+    )
+
     include(FetchContent)
     FetchContent_Declare(
         googletest
@@ -77,4 +84,5 @@ if(BUILD_TESTING)
     add_matching_engine_test(order_book_test tests/order_book_test.cpp)
     add_matching_engine_test(matching_engine_test tests/matching_engine_test.cpp)
     add_matching_engine_test(integration_test tests/integration_test.cpp)
+    add_matching_engine_test(csv_commands_test tests/csv_commands_test.cpp)
 endif()

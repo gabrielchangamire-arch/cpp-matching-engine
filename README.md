@@ -4,9 +4,8 @@ A modern C++20 limit order book and matching engine built as a focused
 systems-engineering project. The implementation will prioritize correctness,
 deterministic price-time matching, clear ownership, and measured performance.
 
-> **Project status:** Phase 4 provides deterministic price-time-priority limit
-> matching, complete and partial fills, cancellation, and lifetime duplicate-ID
-> detection.
+> **Project status:** Phase 5 adds a CSV-driven command-line application to the
+> deterministic matching library.
 
 ## Prerequisites
 
@@ -19,7 +18,7 @@ deterministic price-time matching, clear ownership, and measured performance.
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
 cmake --build build
-./build/matching_engine_cli
+./build/matching_engine_cli examples/sample_orders.csv
 ```
 
 ## Test
@@ -49,6 +48,21 @@ An incoming limit order repeatedly executes against the best opposite-side
 order while prices cross. Each trade executes at the resting order's price.
 Orders at the same price execute in FIFO insertion order, and any incoming
 remainder is added to the book.
+
+## CSV command format
+
+The CLI accepts one command per line. Fields are comma-separated, prices are
+integer ticks, sides are uppercase, blank lines are ignored, and lines beginning
+with `#` are comments.
+
+```text
+ADD,order_id,BUY|SELL,price_ticks,quantity
+CANCEL,order_id
+```
+
+The application prints generated trades immediately, reports rejected lines to
+standard error, continues after malformed input, and finishes with a readable
+book snapshot. It exits with status `2` when one or more commands are rejected.
 
 ## Planned capabilities
 
