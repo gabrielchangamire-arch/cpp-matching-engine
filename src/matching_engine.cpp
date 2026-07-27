@@ -23,14 +23,16 @@ std::vector<Trade> MatchingEngine::submit_limit_order(const OrderId order_id,
     ++next_sequence_;
 
     std::vector<Trade> trades;
-    trades.reserve(book_.order_count());
 
     const Side resting_side = side == Side::buy ? Side::sell : Side::buy;
-    while (!incoming.is_filled()) {
-        Order* const resting = book_.best_order(resting_side);
-        if (resting == nullptr || !crosses(incoming, *resting)) {
-            break;
-        }
+    Order* resting = book_.best_order(resting_side);
+    bool has_crossing_order =
+        resting != nullptr && crosses(incoming, *resting);
+    if (has_crossing_order) {
+        trades.reserve(book_.order_count());
+    }
+
+    while (!incoming.is_filled() && has_crossing_order) {
 
         ensure_sequence_available();
         ensure_trade_id_available();
@@ -57,6 +59,12 @@ std::vector<Trade> MatchingEngine::submit_limit_order(const OrderId order_id,
         trades.push_back(std::move(trade));
         ++next_trade_id_;
         ++next_sequence_;
+
+        if (!incoming.is_filled()) {
+            resting = book_.best_order(resting_side);
+            has_crossing_order =
+                resting != nullptr && crosses(incoming, *resting);
+        }
     }
 
     if (!incoming.is_filled()) {
