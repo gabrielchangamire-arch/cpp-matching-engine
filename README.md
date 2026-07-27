@@ -4,14 +4,15 @@ A modern C++20 limit order book and matching engine built as a focused
 systems-engineering project. The implementation will prioritize correctness,
 deterministic price-time matching, clear ownership, and measured performance.
 
-> **Project status:** Phase 1 establishes the repository and a minimal,
-> warning-clean executable. Order and matching functionality will be added in
-> subsequent, tested phases.
+> **Project status:** Phase 2 provides validated order and trade domain models.
+> Order-book and matching functionality will be added in subsequent, tested
+> phases.
 
 ## Prerequisites
 
 - A C++20 compiler (Apple Clang, Clang, GCC, or MSVC)
 - CMake 3.20 or newer
+- Git (CMake fetches the pinned GoogleTest dependency during test configuration)
 
 ## Build and run
 
@@ -27,9 +28,17 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-The current smoke test verifies that the initial executable starts and exits
-successfully. GoogleTest unit and integration coverage will be introduced with
-the domain model.
+CTest discovers the GoogleTest domain-model tests individually and reports any
+validation or formatting failure by name.
+
+## Domain representation
+
+Prices use signed 64-bit integer ticks rather than floating point. Quantities
+also use signed 64-bit integers so negative inputs can be rejected before they
+reach the book. IDs and monotonic sequence numbers use unsigned 64-bit
+integers. `Order` and `Trade` constructors reject invalid values so downstream
+book logic can rely on their invariants. An order tracks both its original and
+remaining quantity.
 
 ## Planned capabilities
 
