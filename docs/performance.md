@@ -97,6 +97,11 @@ earlier optimization experiment.
 | Four producers, 100 commands | 87,663 ns | 44,470 ns | 2.249 M/s | 1.141 M/s |
 | Four producers, 1,000 commands | 511,243 ns | 180,067 ns | 5.553 M/s | 1.956 M/s |
 
+Version 1.2 adds a deadline-aware queue wait only while the reorder buffer is
+non-empty and the next sequence is absent. Contiguous benchmark streams do not
+enter that recovery path, so the version 1.1 steady-ingestion measurements were
+not rerun or relabeled.
+
 ## Profile evidence
 
 The available system profiler was macOS `/usr/bin/sample`; Xcode Instruments'

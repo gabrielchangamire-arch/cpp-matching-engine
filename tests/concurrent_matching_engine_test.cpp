@@ -1,6 +1,7 @@
 #include "matching_engine/concurrent_matching_engine.hpp"
 
 #include <array>
+#include <chrono>
 #include <future>
 #include <gtest/gtest.h>
 #include <optional>
@@ -9,6 +10,8 @@
 
 namespace matching_engine {
 namespace {
+
+using namespace std::chrono_literals;
 
 TEST(ConcurrentMatchingEngineTest, ProcessesConcurrentProducersByExplicitSequence) {
     ConcurrentMatchingEngine engine{2};
@@ -99,6 +102,11 @@ TEST(ConcurrentMatchingEngineTest, RejectsSequencesBeyondConfiguredGap) {
     engine.shutdown();
 }
 
+TEST(ConcurrentMatchingEngineTest, RejectsNonPositiveSequenceGapTimeout) {
+    EXPECT_THROW(static_cast<void>(ConcurrentMatchingEngine{1, 1, 0ms}),
+                 std::invalid_argument);
+}
+
 TEST(ConcurrentMatchingEngineTest, RejectsProcessedSequenceAsStale) {
     ConcurrentMatchingEngine engine{1, 1};
     auto first = engine.submit(1, AddCommand{1, Side::buy, 100, 1});
@@ -121,6 +129,49 @@ TEST(ConcurrentMatchingEngineTest, RejectsPendingCommandsWhenSequenceHasGap) {
 
     EXPECT_FALSE(result.accepted);
     EXPECT_NE(result.error.find("missing"), std::string::npos);
+}
+
+TEST(ConcurrentMatchingEngineTest, FailsClosedWhenSequenceGapTimesOut) {
+    ConcurrentMatchingEngine engine{4, 4, 25ms};
+    auto first = engine.submit(1, AddCommand{1, Side::buy, 100, 1});
+    ASSERT_TRUE(first.get().accepted);
+
+    auto third = engine.submit(3, AddCommand{3, Side::buy, 100, 1});
+    auto fourth = engine.submit(4, AddCommand{4, Side::buy, 100, 1});
+
+    ASSERT_EQ(third.wait_for(5s), std::future_status::ready);
+    ASSERT_EQ(fourth.wait_for(5s), std::future_status::ready);
+    const auto third_result = third.get();
+    const auto fourth_result = fourth.get();
+    EXPECT_FALSE(third_result.accepted);
+    EXPECT_FALSE(fourth_result.accepted);
+    EXPECT_EQ(third_result.error,
+              "sequence gap timeout while waiting for ingestion sequence 2");
+    EXPECT_EQ(fourth_result.error, third_result.error);
+
+    try {
+        static_cast<void>(engine.submit(2, AddCommand{2, Side::buy, 100, 1}));
+        FAIL() << "submission after a terminal gap timeout should throw";
+    } catch (const std::runtime_error& error) {
+        EXPECT_EQ(error.what(), third_result.error);
+    }
+
+    engine.shutdown();
+    EXPECT_EQ(engine.book_snapshot(), "Order book (1 order)\n"
+                                      "ASKS (best first)\n"
+                                      "  (empty)\n"
+                                      "BIDS (best first)\n"
+                                      "  100 | qty 1 | orders 1\n");
+}
+
+TEST(ConcurrentMatchingEngineTest, ProcessesGapThatArrivesBeforeTimeout) {
+    ConcurrentMatchingEngine engine{2, 2, 5s};
+    auto second = engine.submit(2, AddCommand{2, Side::buy, 100, 1});
+    auto first = engine.submit(1, AddCommand{1, Side::buy, 101, 1});
+
+    EXPECT_TRUE(first.get().accepted);
+    EXPECT_TRUE(second.get().accepted);
+    engine.shutdown();
 }
 
 TEST(ConcurrentMatchingEngineTest, RejectsSubmissionAndAllowsSnapshotAfterShutdown) {

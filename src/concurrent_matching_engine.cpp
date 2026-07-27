@@ -1,5 +1,6 @@
 #include "matching_engine/concurrent_matching_engine.hpp"
 
+#include <chrono>
 #include <limits>
 #include <map>
 #include <stdexcept>
@@ -7,10 +8,23 @@
 #include <utility>
 
 namespace matching_engine {
+namespace {
+
+std::chrono::milliseconds
+validate_sequence_gap_timeout(const std::chrono::milliseconds timeout) {
+    if (timeout <= std::chrono::milliseconds::zero()) {
+        throw std::invalid_argument("sequence gap timeout must be positive");
+    }
+    return timeout;
+}
+
+} // namespace
 
 ConcurrentMatchingEngine::ConcurrentMatchingEngine(
-    const std::size_t queue_capacity, const IngestionSequence max_sequence_gap)
+    const std::size_t queue_capacity, const IngestionSequence max_sequence_gap,
+    const std::chrono::milliseconds sequence_gap_timeout)
     : queue_(queue_capacity), max_sequence_gap_(max_sequence_gap),
+      sequence_gap_timeout_(validate_sequence_gap_timeout(sequence_gap_timeout)),
       worker_(&ConcurrentMatchingEngine::run, this) {}
 
 ConcurrentMatchingEngine::~ConcurrentMatchingEngine() {
@@ -27,6 +41,9 @@ ConcurrentMatchingEngine::submit(const IngestionSequence ingestion_sequence,
     {
         std::scoped_lock lock{state_mutex_};
         if (!accepting_) {
+            if (!terminal_error_.empty()) {
+                throw std::runtime_error(terminal_error_);
+            }
             throw std::runtime_error("concurrent matching engine is shut down");
         }
         if (ingestion_sequence < next_ingestion_sequence_) {
@@ -45,6 +62,9 @@ ConcurrentMatchingEngine::submit(const IngestionSequence ingestion_sequence,
     if (!queue_.push(std::move(envelope))) {
         std::scoped_lock lock{state_mutex_};
         submitted_sequences_.erase(ingestion_sequence);
+        if (!terminal_error_.empty()) {
+            throw std::runtime_error(terminal_error_);
+        }
         throw std::runtime_error("concurrent matching engine stopped accepting");
     }
     return result;
@@ -80,12 +100,16 @@ std::string ConcurrentMatchingEngine::book_snapshot() const {
 }
 
 void ConcurrentMatchingEngine::run() {
+    using Clock = std::chrono::steady_clock;
+
     IngestionSequence next_sequence = 1;
     std::map<IngestionSequence, Envelope> pending;
+    std::optional<Clock::time_point> gap_deadline;
 
     while (true) {
         auto ready = pending.find(next_sequence);
         if (ready != pending.end()) {
+            gap_deadline.reset();
             Envelope envelope = std::move(ready->second);
             pending.erase(ready);
             const IngestionSequence processed_sequence = envelope.ingestion_sequence;
@@ -109,11 +133,41 @@ void ConcurrentMatchingEngine::run() {
             continue;
         }
 
-        auto envelope = queue_.pop();
-        if (!envelope.has_value()) {
-            break;
+        if (pending.empty()) {
+            auto envelope = queue_.pop();
+            if (!envelope.has_value()) {
+                break;
+            }
+            pending.emplace(envelope->ingestion_sequence, std::move(*envelope));
+        } else {
+            if (!gap_deadline.has_value()) {
+                gap_deadline = Clock::now() + sequence_gap_timeout_;
+            }
+
+            auto result = queue_.pop_until(*gap_deadline);
+            if (result.status == ThreadSafeQueue<Envelope>::TimedPopStatus::closed) {
+                break;
+            }
+            if (result.status == ThreadSafeQueue<Envelope>::TimedPopStatus::timeout) {
+                const std::string error =
+                    "sequence gap timeout while waiting for ingestion sequence " +
+                    std::to_string(next_sequence);
+                {
+                    std::scoped_lock lock{state_mutex_};
+                    accepting_ = false;
+                    terminal_error_ = error;
+                }
+                queue_.close();
+                while (auto queued = queue_.pop()) {
+                    pending.emplace(queued->ingestion_sequence, std::move(*queued));
+                }
+                break;
+            }
+            if (!result.value.has_value()) {
+                throw std::logic_error("value pop result has no queue value");
+            }
+            pending.emplace(result.value->ingestion_sequence, std::move(*result.value));
         }
-        pending.emplace(envelope->ingestion_sequence, std::move(*envelope));
     }
 
     for (auto& [sequence, envelope] : pending) {
@@ -121,7 +175,10 @@ void ConcurrentMatchingEngine::run() {
             std::scoped_lock lock{state_mutex_};
             submitted_sequences_.erase(sequence);
         }
-        reject(std::move(envelope), "missing an earlier contiguous ingestion sequence");
+        reject(std::move(envelope),
+               terminal_error_.empty()
+                   ? "missing an earlier contiguous ingestion sequence"
+                   : terminal_error_);
     }
 }
 

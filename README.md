@@ -27,7 +27,7 @@ framework.
 - Best bid/ask, aggregated depth, and readable book snapshots
 - CSV add/cancel CLI that reports malformed or rejected commands and continues
 - Bounded blocking queue, futures, backpressure, and graceful shutdown
-- 84 discovered unit, differential, integration, CLI, queue, and concurrency tests
+- 89 discovered unit, differential, integration, CLI, queue, and concurrency tests
 - Coverage-guided CSV parsing and command validation with Clang libFuzzer
 - Google Benchmark workloads plus an actual profile-guided optimization
 - Strict compiler warnings, clang-format, clang-tidy, sanitizers, and CI
@@ -130,7 +130,7 @@ ctest --test-dir build --output-on-failure
 ```
 
 CTest discovers 83 GoogleTest cases individually and adds the sample CLI as an
-end-to-end test, for 84 tests total. One test executes 12,000 deterministic
+end-to-end test, for 89 tests total. One test executes 12,000 deterministic
 random commands against both the production engine and an independent
 vector-based reference model, comparing trades and book state after every
 command.
@@ -293,13 +293,18 @@ worker without busy waiting. The worker holds out-of-order commands in an
 ordered buffer and applies only the next contiguous ingestion sequence. By
 default, admission rejects a sequence more than 1,024 positions ahead of the
 next expected value, which also bounds the reorder buffer. Processed ingestion
-IDs are removed from the in-flight duplicate set. A future returns acceptance,
-trades, or a validation error to the producer.
+IDs are removed from the in-flight duplicate set. If the next sequence remains
+missing for the configurable timeout (one second by default), the engine fails
+closed: it stops admission, drains the queue, and resolves every buffered future
+with the same precise gap error. It never silently skips input. A future returns
+acceptance, trades, or a validation error to the producer.
 
 Only that worker mutates `MatchingEngine`, preserving deterministic behavior
-and avoiding pervasive book locks. Shutdown stops acceptance, closes the queue,
-wakes waiters, rejects commands after sequence gaps, and joins the worker. This
-is synchronized and intentionally not lock-free.
+and avoiding pervasive book locks. After a gap fault, callers invoke shutdown,
+take an intact snapshot, and replay from a trusted upstream sequence or durable
+log. Ordinary shutdown stops acceptance, closes the queue, wakes waiters,
+rejects commands after sequence gaps, and joins the worker. This is synchronized
+and intentionally not lock-free.
 
 ## Correctness guarantees
 
@@ -313,7 +318,7 @@ is synchronized and intentionally not lock-free.
 - Concurrent producers cannot mutate the order book directly.
 
 These guarantees are enforced by constructors and engine checks and exercised
-by 84 tests, including exact-trade integration scenarios, concurrent submission,
+by 89 tests, including exact-trade integration scenarios, concurrent submission,
 and comparison against a deliberately simple reference matcher. ASan/UBSan,
 TSan, and a libFuzzer smoke run add dynamic memory, undefined-behavior, race, and
 malformed-input checks; they do not constitute a formal proof.
@@ -321,13 +326,13 @@ malformed-input checks; they do not constitute a formal proof.
 ## Known limitations
 
 - One in-memory book and one limit-order type; no symbols, market orders,
-  replace command, persistence, recovery, or networking
+  replace command, persistence, crash recovery, or networking
 - Prices are caller-defined ticks; currency scale and tick-size policy are not
   encoded in the type
 - The lifetime ID set grows even after orders finish
-- Concurrent ingestion requires positive, unique, contiguous caller-supplied
-  sequence numbers; missing sequences within the configured window delay later
-  commands until shutdown
+- Concurrent ingestion fails closed when a caller-supplied sequence remains
+  missing past the configured timeout; automated durable replay is an upstream
+  responsibility
 - CSV parsing intentionally omits quoted fields and headers
 - Standard containers allocate dynamically; allocation failure is not handled
   transactionally
@@ -340,7 +345,7 @@ malformed-input checks; they do not constitute a formal proof.
 - Snapshotting, event logging, replay, and crash recovery
 - Strong price/quantity value types with instrument tick validation
 - Memory pools or flat/contiguous price-level structures, justified by profiles
-- Sequence-gap timeout/recovery policy and richer backpressure telemetry
+- Automated replay orchestration and richer gap/backpressure telemetry
 - HDR-histogram end-to-end latency measurements under pinned, controlled load
 - Longer scheduled fuzzing and additional conservation properties
 

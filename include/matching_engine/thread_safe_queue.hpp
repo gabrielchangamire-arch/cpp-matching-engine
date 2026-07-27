@@ -1,7 +1,9 @@
 #pragma once
 
+#include <chrono>
 #include <condition_variable>
 #include <cstddef>
+#include <cstdint>
 #include <deque>
 #include <mutex>
 #include <optional>
@@ -12,6 +14,13 @@ namespace matching_engine {
 
 template <typename Value> class ThreadSafeQueue {
   public:
+    enum class TimedPopStatus : std::uint8_t { value, closed, timeout };
+
+    struct TimedPopResult {
+        TimedPopStatus status;
+        std::optional<Value> value;
+    };
+
     explicit ThreadSafeQueue(const std::size_t capacity) : capacity_(capacity) {
         if (capacity_ == 0) {
             throw std::invalid_argument("queue capacity must be positive");
@@ -50,6 +59,25 @@ template <typename Value> class ThreadSafeQueue {
         lock.unlock();
         not_full_.notify_one();
         return value;
+    }
+
+    template <typename Clock, typename Duration>
+    [[nodiscard]] TimedPopResult
+    pop_until(const std::chrono::time_point<Clock, Duration>& deadline) {
+        std::unique_lock lock{mutex_};
+        if (!not_empty_.wait_until(lock, deadline,
+                                   [this] { return closed_ || !values_.empty(); })) {
+            return {TimedPopStatus::timeout, std::nullopt};
+        }
+        if (values_.empty()) {
+            return {TimedPopStatus::closed, std::nullopt};
+        }
+
+        Value value = std::move(values_.front());
+        values_.pop_front();
+        lock.unlock();
+        not_full_.notify_one();
+        return {TimedPopStatus::value, std::move(value)};
     }
 
     void close() {

@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.20)
 
 project(
     cpp_matching_engine
-    VERSION 1.1.0
+    VERSION 1.2.0
     DESCRIPTION "A price-time-priority limit order book and matching engine"
     LANGUAGES CXX
 )

@@ -15,7 +15,7 @@ distribution, and multiple instruments are intentionally outside the design.
 | `OrderBook` | Own active orders, price levels, aggregate quantities, and cancellation index |
 | `MatchingEngine` | Assign sequences/trade IDs, reject reused IDs, execute crossing orders, and rest remainders |
 | CSV command layer | Parse add/cancel records, isolate per-line errors, invoke the reusable engine, and format output |
-| `ThreadSafeQueue<T>` | Provide bounded blocking FIFO transport, backpressure, close, and waiter wakeup |
+| `ThreadSafeQueue<T>` | Provide bounded blocking FIFO transport, deadline-aware waits, backpressure, close, and waiter wakeup |
 | `ConcurrentMatchingEngine` | Accept producers, reorder by explicit ingestion sequence, serialize mutations, and return futures |
 | Benchmark executable | Exercise focused and mixed workloads while excluding setup/teardown from timed regions |
 
@@ -99,6 +99,10 @@ The core engine is deliberately single-threaded and has no internal mutexes.
 - Admission limits sequences to a configurable window ahead of the next
   expected value (1,024 by default), bounding the ordered buffer independently
   of producer behavior.
+- Once an out-of-order command exposes a gap, the worker uses one fixed,
+  configurable deadline (one second by default). Later arrivals do not extend
+  it. If it expires, the worker stops admission, closes and drains the queue,
+  and rejects every buffered command with the missing sequence in the error.
 - A small state mutex protects acceptance, submitted sequence IDs, worker state,
   and post-shutdown snapshot access. A separate shutdown mutex makes shutdown
   idempotent and serializes joining.
@@ -139,7 +143,9 @@ The CSV layer catches errors per line, reports the line number, continues, and
 returns a rejected-command count. The concurrent layer converts command-level
 exceptions into a rejected `CommandResult`; API misuse such as zero/duplicate
 ingestion sequences, stale sequences, sequences outside the configured window,
-or submission after shutdown throws immediately.
+or submission after shutdown throws immediately. A terminal gap timeout is also
+returned by every buffered future and by subsequent submission attempts, so
+callers receive a consistent recovery reason.
 
 Allocation failure is allowed to propagate. The implementation does not claim
 a strong transactional exception guarantee for out-of-memory conditions.
@@ -156,8 +162,9 @@ For a fixed command sequence, output is deterministic because:
 - Execution price is always the already-resting order's price.
 
 Wall-clock timestamps and thread scheduling never participate in priority.
-Missing concurrent sequences are rejected at shutdown rather than allowing
-later commands to execute in a different order.
+Missing concurrent sequences trigger a fail-closed deadline rather than
+allowing later commands to execute in a different order. Already-applied book
+state remains available after shutdown for snapshot and trusted replay.
 
 ## Verification strategy
 

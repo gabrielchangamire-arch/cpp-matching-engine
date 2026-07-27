@@ -117,9 +117,8 @@ into its reorder map, and retaining every submitted ingestion ID caused lifetime
 memory growth. A numeric window bounds both structures while preserving
 deterministic out-of-order producer admission.
 
-**Tradeoff:** A missing sequence can still delay commands inside the accepted
-window until shutdown. A production gateway should normally own sequencing and
-define a timeout or recovery protocol.
+**Tradeoff:** A missing sequence can delay commands inside the accepted window.
+ADR-009 bounds that delay and defines the terminal recovery behavior.
 
 ## ADR-008: Combine differential testing with coverage-guided fuzzing
 
@@ -138,3 +137,23 @@ that is impractical to enumerate manually.
 independent to avoid reproducing production bugs. Fuzzing requires a Clang
 distribution with the libFuzzer runtime, and a ten-second CI smoke run cannot
 replace longer dedicated campaigns.
+
+## ADR-009: Fail closed on a sequence-gap deadline
+
+**Status:** Accepted
+
+**Decision:** Start one fixed deadline when an out-of-order command first makes
+the next expected ingestion sequence absent. If the sequence does not arrive
+before the configurable timeout, stop admission, close and drain the queue, and
+reject every buffered command with the expected sequence in a shared terminal
+error. The default timeout is one second. Never advance over missing input.
+
+**Why:** Waiting until shutdown leaves producer futures unresolved indefinitely,
+while silently skipping a command can apply an invalid market history. Failing
+closed bounds the wait, preserves the last contiguous book state, and gives an
+upstream sequencer an unambiguous point from which to repair or replay.
+
+**Tradeoff:** The facade does not own a durable event log, so it cannot fetch the
+missing command or restart itself. A caller must shut down the faulted instance,
+snapshot or restore trusted state, and replay through a new instance. The
+timeout must be tuned above expected producer and scheduling jitter.

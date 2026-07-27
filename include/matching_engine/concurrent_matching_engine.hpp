@@ -5,6 +5,7 @@
 #include "matching_engine/thread_safe_queue.hpp"
 #include "matching_engine/trade.hpp"
 
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <future>
@@ -28,10 +29,12 @@ struct CommandResult {
 class ConcurrentMatchingEngine {
   public:
     static constexpr IngestionSequence default_max_sequence_gap{1'024};
+    static constexpr std::chrono::milliseconds default_sequence_gap_timeout{1'000};
 
     explicit ConcurrentMatchingEngine(
         std::size_t queue_capacity,
-        IngestionSequence max_sequence_gap = default_max_sequence_gap);
+        IngestionSequence max_sequence_gap = default_max_sequence_gap,
+        std::chrono::milliseconds sequence_gap_timeout = default_sequence_gap_timeout);
     ~ConcurrentMatchingEngine();
 
     ConcurrentMatchingEngine(const ConcurrentMatchingEngine&) = delete;
@@ -59,11 +62,13 @@ class ConcurrentMatchingEngine {
     ThreadSafeQueue<Envelope> queue_;
     MatchingEngine engine_;
     const IngestionSequence max_sequence_gap_;
+    const std::chrono::milliseconds sequence_gap_timeout_;
 
     mutable std::mutex shutdown_mutex_;
     mutable std::mutex state_mutex_;
     std::unordered_set<IngestionSequence> submitted_sequences_;
     IngestionSequence next_ingestion_sequence_{1};
+    std::string terminal_error_;
     bool accepting_{true};
     bool worker_finished_{false};
     std::thread worker_;

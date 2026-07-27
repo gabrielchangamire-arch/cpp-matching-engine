@@ -60,5 +60,29 @@ TEST(ThreadSafeQueueTest, ClosedQueueRejectsNewValuesButDrainsExistingValues) {
     EXPECT_FALSE(queue.pop().has_value());
 }
 
+TEST(ThreadSafeQueueTest, TimedPopReportsTimeoutWithoutClosingQueue) {
+    ThreadSafeQueue<int> queue{1};
+
+    const auto result = queue.pop_until(std::chrono::steady_clock::now() + 20ms);
+
+    EXPECT_EQ(result.status, ThreadSafeQueue<int>::TimedPopStatus::timeout);
+    EXPECT_FALSE(result.value.has_value());
+    EXPECT_FALSE(queue.is_closed());
+}
+
+TEST(ThreadSafeQueueTest, TimedPopDistinguishesValueFromClosedQueue) {
+    ThreadSafeQueue<int> queue{1};
+    ASSERT_TRUE(queue.push(10));
+    queue.close();
+
+    const auto value = queue.pop_until(std::chrono::steady_clock::now() + 1s);
+    ASSERT_EQ(value.status, ThreadSafeQueue<int>::TimedPopStatus::value);
+    EXPECT_EQ(value.value, std::optional<int>{10});
+
+    const auto closed = queue.pop_until(std::chrono::steady_clock::now() + 1s);
+    EXPECT_EQ(closed.status, ThreadSafeQueue<int>::TimedPopStatus::closed);
+    EXPECT_FALSE(closed.value.has_value());
+}
+
 } // namespace
 } // namespace matching_engine
