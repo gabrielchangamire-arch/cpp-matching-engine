@@ -4,9 +4,9 @@ A modern C++20 limit order book and matching engine built as a focused
 systems-engineering project. The implementation will prioritize correctness,
 deterministic price-time matching, clear ownership, and measured performance.
 
-> **Project status:** Phase 2 provides validated order and trade domain models.
-> Order-book and matching functionality will be added in subsequent, tested
-> phases.
+> **Project status:** Phase 3 provides a validated domain model and a
+> single-threaded order book with ordered depth and efficient cancellation.
+> Matching functionality will be added next.
 
 ## Prerequisites
 
@@ -39,6 +39,11 @@ reach the book. IDs and monotonic sequence numbers use unsigned 64-bit
 integers. `Order` and `Trade` constructors reject invalid values so downstream
 book logic can rely on their invariants. An order tracks both its original and
 remaining quantity.
+
+The order book stores bids in descending-price order and asks in
+ascending-price order. Each price level owns a FIFO list of orders. A hash-table
+index maps active order IDs to stable list iterators, supporting average
+constant-time order lookup and list removal during cancellation.
 
 ## Planned capabilities
 

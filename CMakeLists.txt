@@ -24,6 +24,7 @@ endfunction()
 
 add_library(
     matching_engine
+    src/order_book.cpp
     src/order.cpp
     src/trade.cpp
     src/types.cpp
@@ -56,16 +57,21 @@ if(BUILD_TESTING)
     set(BUILD_GMOCK OFF CACHE BOOL "" FORCE)
     FetchContent_MakeAvailable(googletest)
 
-    add_executable(domain_model_test tests/domain_model_test.cpp)
-    target_link_libraries(
-        domain_model_test
-        PRIVATE
-            matching_engine
-            GTest::gtest_main
-    )
-    set_target_properties(domain_model_test PROPERTIES CXX_EXTENSIONS OFF)
-    enable_strict_warnings(domain_model_test)
-
     include(GoogleTest)
-    gtest_discover_tests(domain_model_test)
+
+    function(add_matching_engine_test target_name source_file)
+        add_executable(${target_name} ${source_file})
+        target_link_libraries(
+            ${target_name}
+            PRIVATE
+                matching_engine
+                GTest::gtest_main
+        )
+        set_target_properties(${target_name} PROPERTIES CXX_EXTENSIONS OFF)
+        enable_strict_warnings(${target_name})
+        gtest_discover_tests(${target_name})
+    endfunction()
+
+    add_matching_engine_test(domain_model_test tests/domain_model_test.cpp)
+    add_matching_engine_test(order_book_test tests/order_book_test.cpp)
 endif()
