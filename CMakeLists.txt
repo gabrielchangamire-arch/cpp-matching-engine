@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.20)
 
 project(
     cpp_matching_engine
-    VERSION 1.0.0
+    VERSION 1.1.0
     DESCRIPTION "A price-time-priority limit order book and matching engine"
     LANGUAGES CXX
 )
@@ -10,12 +10,22 @@ project(
 find_package(Threads REQUIRED)
 
 option(MATCHING_ENGINE_BUILD_BENCHMARKS "Build Google Benchmark targets" OFF)
+option(MATCHING_ENGINE_BUILD_FUZZERS "Build Clang libFuzzer targets" OFF)
 option(MATCHING_ENGINE_ENABLE_ASAN_UBSAN "Enable AddressSanitizer and UBSan" OFF)
 option(MATCHING_ENGINE_ENABLE_TSAN "Enable ThreadSanitizer" OFF)
 option(MATCHING_ENGINE_ENABLE_CLANG_TIDY "Run clang-tidy during compilation" OFF)
 
 if(MATCHING_ENGINE_ENABLE_ASAN_UBSAN AND MATCHING_ENGINE_ENABLE_TSAN)
     message(FATAL_ERROR "ASan/UBSan and TSan require separate build trees")
+endif()
+
+if(MATCHING_ENGINE_BUILD_FUZZERS)
+    if(MATCHING_ENGINE_ENABLE_ASAN_UBSAN OR MATCHING_ENGINE_ENABLE_TSAN)
+        message(FATAL_ERROR "Fuzzers configure their own sanitizer build")
+    endif()
+    if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        message(FATAL_ERROR "The fuzz targets require Clang libFuzzer")
+    endif()
 endif()
 
 if(MATCHING_ENGINE_ENABLE_ASAN_UBSAN OR MATCHING_ENGINE_ENABLE_TSAN)
@@ -94,12 +104,44 @@ set_target_properties(matching_engine_cli PROPERTIES CXX_EXTENSIONS OFF)
 enable_strict_warnings(matching_engine_cli)
 enable_clang_tidy(matching_engine_cli)
 
+if(MATCHING_ENGINE_BUILD_FUZZERS)
+    target_compile_options(
+        matching_engine
+        PRIVATE
+            -fsanitize=fuzzer-no-link,address,undefined
+            -fno-omit-frame-pointer
+    )
+    target_link_options(
+        matching_engine_cli
+        PRIVATE
+            -fsanitize=fuzzer-no-link,address,undefined
+    )
+
+    add_executable(csv_command_fuzzer fuzz/csv_command_fuzzer.cpp)
+    target_link_libraries(csv_command_fuzzer PRIVATE matching_engine)
+    target_compile_options(
+        csv_command_fuzzer
+        PRIVATE
+            -fsanitize=fuzzer,address,undefined
+            -fno-omit-frame-pointer
+    )
+    target_link_options(
+        csv_command_fuzzer
+        PRIVATE
+            -fsanitize=fuzzer,address,undefined
+    )
+    set_target_properties(csv_command_fuzzer PROPERTIES CXX_EXTENSIONS OFF)
+    enable_strict_warnings(csv_command_fuzzer)
+    enable_clang_tidy(csv_command_fuzzer)
+endif()
+
 find_program(MATCHING_ENGINE_CLANG_FORMAT_EXECUTABLE NAMES clang-format)
 if(MATCHING_ENGINE_CLANG_FORMAT_EXECUTABLE)
     file(
         GLOB_RECURSE MATCHING_ENGINE_FORMAT_FILES
         CONFIGURE_DEPENDS
         ${CMAKE_CURRENT_SOURCE_DIR}/benchmarks/*.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/fuzz/*.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/*.cpp
@@ -159,6 +201,10 @@ if(BUILD_TESTING)
     add_matching_engine_test(domain_model_test tests/domain_model_test.cpp)
     add_matching_engine_test(order_book_test tests/order_book_test.cpp)
     add_matching_engine_test(matching_engine_test tests/matching_engine_test.cpp)
+    add_matching_engine_test(
+        matching_engine_property_test
+        tests/matching_engine_property_test.cpp
+    )
     add_matching_engine_test(integration_test tests/integration_test.cpp)
     add_matching_engine_test(csv_commands_test tests/csv_commands_test.cpp)
     add_matching_engine_test(thread_safe_queue_test tests/thread_safe_queue_test.cpp)

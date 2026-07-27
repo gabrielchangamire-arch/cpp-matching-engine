@@ -69,6 +69,10 @@ ns after the change in wall time. That corresponds to approximately 1.64 and
 2.24 million commands/s, a 37.1% wall-throughput improvement. The much larger
 CPU-time throughput delta in the table should not be read as end-to-end latency.
 
+These baseline/post results describe the version 1.0 allocation experiment.
+Version 1.1 subsequently changed concurrent-ingestion admission and sequence
+bookkeeping; the single-threaded order-book and matching paths were unchanged.
+
 Representative median CPU times were:
 
 | Case | Baseline | Post |
@@ -77,6 +81,21 @@ Representative median CPU times were:
 | Cross 1,000 resting orders | 25,460 ns | 26,750 ns |
 | Mixed 1,000 operations | 48,699 ns | 38,688 ns |
 | Single-producer 1,000 commands | 381,973 ns | 239,534 ns |
+
+## Version 1.1 ingestion verification
+
+The version 1.1 bounded sequence window and in-flight sequence cleanup were
+rechecked on the same machine with the same Release build and five-repetition
+median command. The run reported load averages of 5.46, 3.20, and 3.27, so it is
+recorded as a current-code verification rather than compared directly with the
+earlier optimization experiment.
+
+| Case | Median wall time | Median CPU time | CPU-time throughput | Wall throughput |
+|---|---:|---:|---:|---:|
+| Single producer, 100 commands | 51,934 ns | 35,758 ns | 2.797 M/s | 1.926 M/s |
+| Single producer, 1,000 commands | 346,311 ns | 265,620 ns | 3.765 M/s | 2.887 M/s |
+| Four producers, 100 commands | 87,663 ns | 44,470 ns | 2.249 M/s | 1.141 M/s |
+| Four producers, 1,000 commands | 511,243 ns | 180,067 ns | 5.553 M/s | 1.956 M/s |
 
 ## Profile evidence
 
@@ -106,8 +125,8 @@ through the fill loop rather than recomputing an extra branch solely for
 reservation.
 
 This is intentionally a small change: it preserves containers, public APIs,
-matching rules, and asymptotic behavior. All 81 tests plus ASan/UBSan and TSan
-runs passed after the modification.
+matching rules, and asymptotic behavior. All 81 tests that existed during that
+optimization phase, plus ASan/UBSan and TSan runs, passed after the modification.
 
 Insertion and mixed cases improved materially, which is consistent with
 removing an empty-result allocation. The optimization was not intended to

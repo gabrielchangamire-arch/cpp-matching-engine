@@ -96,9 +96,18 @@ The core engine is deliberately single-threaded and has no internal mutexes.
   (`not_empty` and `not_full`). Waiting threads sleep rather than spin.
 - One worker moves envelopes into an ordered map and processes only the next
   contiguous sequence.
+- Admission limits sequences to a configurable window ahead of the next
+  expected value (1,024 by default), bounding the ordered buffer independently
+  of producer behavior.
 - A small state mutex protects acceptance, submitted sequence IDs, worker state,
   and post-shutdown snapshot access. A separate shutdown mutex makes shutdown
   idempotent and serializes joining.
+
+The submitted-sequence hash set contains only commands that are queued, pending,
+or executing. The worker removes each sequence after processing, while stale
+values are rejected by comparing them with the next expected sequence. This
+keeps duplicate detection bounded by the configured admission window rather
+than process lifetime.
 
 This single-writer design makes price-time behavior independent of producer
 scheduling. Putting locks throughout `OrderBook` would make multi-step matches
@@ -129,7 +138,8 @@ cancellation returns `false`, allowing each caller to choose policy.
 The CSV layer catches errors per line, reports the line number, continues, and
 returns a rejected-command count. The concurrent layer converts command-level
 exceptions into a rejected `CommandResult`; API misuse such as zero/duplicate
-ingestion sequences or submission after shutdown throws immediately.
+ingestion sequences, stale sequences, sequences outside the configured window,
+or submission after shutdown throws immediately.
 
 Allocation failure is allowed to propagate. The implementation does not claim
 a strong transactional exception guarantee for out-of-memory conditions.
@@ -148,3 +158,16 @@ For a fixed command sequence, output is deterministic because:
 Wall-clock timestamps and thread scheduling never participate in priority.
 Missing concurrent sequences are rejected at shutdown rather than allowing
 later commands to execute in a different order.
+
+## Verification strategy
+
+Example-driven unit tests cover named edge cases. A deterministic differential
+test adds a second line of defense: 24 random seeds generate 500 commands each,
+and a simple vector-scanning reference matcher independently computes expected
+trades and book state. The test compares trade IDs, sides, prices, quantities,
+sequences, full depth, best prices, active counts, and the invariant that the
+resting book is never crossed after a command.
+
+The CSV fuzz target instruments both parsing and command validation with
+libFuzzer, AddressSanitizer, and UndefinedBehaviorSanitizer. CI runs a short
+smoke session; longer local or scheduled runs can reuse the same harness.

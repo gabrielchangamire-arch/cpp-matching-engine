@@ -20,6 +20,13 @@ Testing/
 *.profdata
 *.profraw
 
+# libFuzzer findings
+crash-*
+leak-*
+oom-*
+slow-unit-*
+timeout-*
+
 # Editor and operating-system files
 .DS_Store
 .idea/

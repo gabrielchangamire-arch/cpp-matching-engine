@@ -122,3 +122,30 @@ jobs:
           -DMATCHING_ENGINE_BUILD_BENCHMARKS=ON
       - name: Build benchmark target
         run: cmake --build build-benchmark --target matching_engine_benchmark --parallel
+
+  fuzz-smoke:
+    name: CSV parser fuzz smoke test
+    runs-on: ubuntu-latest
+    env:
+      CC: clang
+      CXX: clang++
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes clang ninja-build
+      - name: Configure
+        run: >-
+          cmake -S . -B build-fuzz -G Ninja
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          -DBUILD_TESTING=OFF
+          -DMATCHING_ENGINE_BUILD_FUZZERS=ON
+      - name: Build fuzz target
+        run: cmake --build build-fuzz --target csv_command_fuzzer --parallel
+      - name: Fuzz parser and command validation
+        run: >-
+          ./build-fuzz/csv_command_fuzzer
+          -dict=fuzz/csv_commands.dict
+          -max_len=4096
+          -max_total_time=10

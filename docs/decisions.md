@@ -102,3 +102,39 @@ named operation. A before/after profile prevents speculative optimization.
 affinity control, background load, allocator effects, and process CPU accounting
 for multiple threads limit generalization. Results are directional evidence,
 not service-level latency claims.
+
+## ADR-007: Bound explicit sequence reordering
+
+**Status:** Accepted
+
+**Decision:** Reject commands whose ingestion sequence is farther than a
+configurable window ahead of the next expected sequence. The default maximum
+gap is 1,024. Track duplicate sequences only while they are in flight, and
+reject completed values as stale.
+
+**Why:** Queue capacity alone did not bound commands after the worker moved them
+into its reorder map, and retaining every submitted ingestion ID caused lifetime
+memory growth. A numeric window bounds both structures while preserving
+deterministic out-of-order producer admission.
+
+**Tradeoff:** A missing sequence can still delay commands inside the accepted
+window until shutdown. A production gateway should normally own sequencing and
+define a timeout or recovery protocol.
+
+## ADR-008: Combine differential testing with coverage-guided fuzzing
+
+**Status:** Accepted
+
+**Decision:** Compare randomized command streams with a slow independent
+reference model, and expose CSV parsing plus command validation through an
+optional Clang libFuzzer target instrumented with ASan/UBSan.
+
+**Why:** Example tests are readable but cover only cases anticipated by their
+author. The reference model checks semantic equivalence across thousands of
+state transitions, while mutation-based fuzzing explores malformed byte input
+that is impractical to enumerate manually.
+
+**Tradeoff:** The reference implementation must remain intentionally simple and
+independent to avoid reproducing production bugs. Fuzzing requires a Clang
+distribution with the libFuzzer runtime, and a ten-second CI smoke run cannot
+replace longer dedicated campaigns.

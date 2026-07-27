@@ -1,0 +1,6 @@
+add="ADD,"
+cancel="CANCEL,"
+buy="BUY,"
+sell="SELL,"
+comma=","
+comment="#"
