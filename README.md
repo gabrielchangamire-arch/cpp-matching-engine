@@ -4,8 +4,8 @@ A modern C++20 limit order book and matching engine built as a focused
 systems-engineering project. The implementation will prioritize correctness,
 deterministic price-time matching, clear ownership, and measured performance.
 
-> **Project status:** Phase 5 adds a CSV-driven command-line application to the
-> deterministic matching library.
+> **Project status:** Phase 6 adds bounded, deterministic multi-producer command
+> ingestion around the single-threaded matching core.
 
 ## Prerequisites
 
@@ -63,6 +63,16 @@ CANCEL,order_id
 The application prints generated trades immediately, reports rejected lines to
 standard error, continues after malformed input, and finishes with a readable
 book snapshot. It exits with status `2` when one or more commands are rejected.
+
+## Concurrency model
+
+Producers submit commands with explicit, contiguous ingestion sequences to a
+bounded blocking queue. A single worker reorders queued commands by that
+sequence and is the only thread that mutates the matching engine. Condition
+variables provide sleep-based coordination and bounded capacity provides
+backpressure. Shutdown closes the queue, wakes blocked threads, resolves
+pending futures, and joins the worker. This design is synchronized, not
+lock-free.
 
 ## Planned capabilities
 

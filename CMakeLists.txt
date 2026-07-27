@@ -7,6 +7,8 @@ project(
     LANGUAGES CXX
 )
 
+find_package(Threads REQUIRED)
+
 function(enable_strict_warnings target_name)
     if(MSVC)
         target_compile_options(${target_name} PRIVATE /W4 /WX)
@@ -24,6 +26,7 @@ endfunction()
 
 add_library(
     matching_engine
+    src/concurrent_matching_engine.cpp
     src/csv_commands.cpp
     src/matching_engine.cpp
     src/order_book.cpp
@@ -32,6 +35,7 @@ add_library(
     src/types.cpp
 )
 target_compile_features(matching_engine PUBLIC cxx_std_20)
+target_link_libraries(matching_engine PUBLIC Threads::Threads)
 target_include_directories(
     matching_engine
     PUBLIC
@@ -85,4 +89,9 @@ if(BUILD_TESTING)
     add_matching_engine_test(matching_engine_test tests/matching_engine_test.cpp)
     add_matching_engine_test(integration_test tests/integration_test.cpp)
     add_matching_engine_test(csv_commands_test tests/csv_commands_test.cpp)
+    add_matching_engine_test(thread_safe_queue_test tests/thread_safe_queue_test.cpp)
+    add_matching_engine_test(
+        concurrent_matching_engine_test
+        tests/concurrent_matching_engine_test.cpp
+    )
 endif()
