@@ -23,4 +23,4 @@ struct CancelCommand {
 
 using Command = std::variant<AddCommand, CancelCommand>;
 
-}  // namespace matching_engine
+} // namespace matching_engine

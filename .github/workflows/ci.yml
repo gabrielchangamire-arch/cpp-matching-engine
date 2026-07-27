@@ -1,0 +1,124 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: ${{ matrix.build_type }} build and test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        build_type: [Debug, Release]
+    env:
+      CC: clang
+      CXX: clang++
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes clang ninja-build
+      - name: Cache fetched dependencies
+        uses: actions/cache@v4
+        with:
+          path: build-${{ matrix.build_type }}/_deps
+          key: deps-${{ runner.os }}-${{ matrix.build_type }}-${{ hashFiles('CMakeLists.txt') }}
+      - name: Configure
+        run: >-
+          cmake -S . -B build-${{ matrix.build_type }} -G Ninja
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+      - name: Build
+        run: cmake --build build-${{ matrix.build_type }} --parallel
+      - name: Test
+        run: ctest --test-dir build-${{ matrix.build_type }} --output-on-failure
+
+  sanitizers:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: ASan and UBSan
+            option: MATCHING_ENGINE_ENABLE_ASAN_UBSAN
+          - name: ThreadSanitizer
+            option: MATCHING_ENGINE_ENABLE_TSAN
+    env:
+      CC: clang
+      CXX: clang++
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes clang ninja-build
+      - name: Configure
+        run: >-
+          cmake -S . -B build-sanitized -G Ninja
+          -DCMAKE_BUILD_TYPE=Debug
+          -D${{ matrix.option }}=ON
+      - name: Build
+        run: cmake --build build-sanitized --parallel
+      - name: Test
+        run: ctest --test-dir build-sanitized --output-on-failure
+
+  formatting:
+    name: clang-format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install clang-format
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes clang-format ninja-build
+      - name: Configure
+        run: cmake -S . -B build-format -G Ninja -DBUILD_TESTING=OFF
+      - name: Check formatting
+        run: cmake --build build-format --target format-check
+
+  static-analysis:
+    name: clang-tidy
+    runs-on: ubuntu-latest
+    env:
+      CC: clang
+      CXX: clang++
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install analysis tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes clang clang-tidy ninja-build
+      - name: Configure
+        run: >-
+          cmake -S . -B build-tidy -G Ninja
+          -DCMAKE_BUILD_TYPE=Debug
+          -DMATCHING_ENGINE_ENABLE_CLANG_TIDY=ON
+      - name: Analyze while building
+        run: cmake --build build-tidy --parallel
+
+  benchmark-build:
+    name: Release benchmark build
+    runs-on: ubuntu-latest
+    env:
+      CC: clang
+      CXX: clang++
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes clang ninja-build
+      - name: Configure
+        run: >-
+          cmake -S . -B build-benchmark -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DBUILD_TESTING=OFF
+          -DMATCHING_ENGINE_BUILD_BENCHMARKS=ON
+      - name: Build benchmark target
+        run: cmake --build build-benchmark --target matching_engine_benchmark --parallel

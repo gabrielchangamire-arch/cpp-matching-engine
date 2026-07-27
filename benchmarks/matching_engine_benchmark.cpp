@@ -2,7 +2,6 @@
 #include "matching_engine/matching_engine.hpp"
 
 #include <benchmark/benchmark.h>
-
 #include <cstddef>
 #include <cstdint>
 #include <future>
@@ -57,11 +56,9 @@ void BM_CrossingMatch(benchmark::State& state) {
         }
         state.ResumeTiming();
 
-        benchmark::DoNotOptimize(engine->submit_limit_order(
-            resting_orders + 1,
-            Side::buy,
-            10'000,
-            static_cast<Quantity>(resting_orders)));
+        benchmark::DoNotOptimize(
+            engine->submit_limit_order(resting_orders + 1, Side::buy, 10'000,
+                                       static_cast<Quantity>(resting_orders)));
 
         state.PauseTiming();
         benchmark::ClobberMemory();
@@ -101,11 +98,10 @@ void BM_BestBidAskLookup(benchmark::State& state) {
     const auto initial_book_size = static_cast<OrderId>(state.range(0));
     for (OrderId id = 1; id <= initial_book_size; ++id) {
         const Price price = 10'000 - static_cast<Price>(id % 100);
-        benchmark::DoNotOptimize(
-            engine.submit_limit_order(id, Side::buy, price, 1));
+        benchmark::DoNotOptimize(engine.submit_limit_order(id, Side::buy, price, 1));
     }
-    benchmark::DoNotOptimize(engine.submit_limit_order(
-        initial_book_size + 1, Side::sell, 10'100, 1));
+    benchmark::DoNotOptimize(
+        engine.submit_limit_order(initial_book_size + 1, Side::sell, 10'100, 1));
 
     for (auto iteration : state) {
         static_cast<void>(iteration);
@@ -130,15 +126,11 @@ void BM_MixedWorkload(benchmark::State& state) {
             benchmark::DoNotOptimize(
                 engine->submit_limit_order(id, Side::buy, 10'000, 1));
         }
-        for (OrderId id = orders_per_group * 2 + 1;
-             id <= orders_per_group * 3;
-             ++id) {
+        for (OrderId id = orders_per_group * 2 + 1; id <= orders_per_group * 3; ++id) {
             benchmark::DoNotOptimize(
                 engine->submit_limit_order(id, Side::sell, 10'000, 1));
         }
-        for (OrderId id = orders_per_group + 1;
-             id <= orders_per_group * 2;
-             ++id) {
+        for (OrderId id = orders_per_group + 1; id <= orders_per_group * 2; ++id) {
             benchmark::DoNotOptimize(engine->cancel(id));
         }
 
@@ -164,9 +156,8 @@ void BM_SingleProducerIngestion(benchmark::State& state) {
 
         for (std::size_t index = 0; index < command_count; ++index) {
             const auto sequence = static_cast<IngestionSequence>(index + 1);
-            futures.push_back(engine->submit(
-                sequence,
-                AddCommand{sequence, Side::buy, 10'000, 1}));
+            futures.push_back(
+                engine->submit(sequence, AddCommand{sequence, Side::buy, 10'000, 1}));
         }
         for (auto& future : futures) {
             benchmark::DoNotOptimize(future.get());
@@ -190,8 +181,7 @@ void BM_MultipleProducerIngestion(benchmark::State& state) {
         static_cast<void>(iteration);
         state.PauseTiming();
         auto engine = std::make_unique<ConcurrentMatchingEngine>(command_count);
-        std::vector<std::optional<std::future<CommandResult>>> futures(
-            command_count);
+        std::vector<std::optional<std::future<CommandResult>>> futures(command_count);
         std::vector<std::thread> producers;
         producers.reserve(producer_count);
         state.ResumeTiming();
@@ -200,11 +190,9 @@ void BM_MultipleProducerIngestion(benchmark::State& state) {
             producers.emplace_back([&, producer] {
                 for (std::size_t index = producer; index < command_count;
                      index += producer_count) {
-                    const auto sequence =
-                        static_cast<IngestionSequence>(index + 1);
+                    const auto sequence = static_cast<IngestionSequence>(index + 1);
                     futures[index] = engine->submit(
-                        sequence,
-                        AddCommand{sequence, Side::buy, 10'000, 1});
+                        sequence, AddCommand{sequence, Side::buy, 10'000, 1});
                 }
             });
         }
@@ -233,7 +221,7 @@ BENCHMARK(BM_MixedWorkload);
 BENCHMARK(BM_SingleProducerIngestion)->Arg(100)->Arg(1'000);
 BENCHMARK(BM_MultipleProducerIngestion)->Arg(100)->Arg(1'000);
 
-}  // namespace
-}  // namespace matching_engine
+} // namespace
+} // namespace matching_engine
 
 BENCHMARK_MAIN();

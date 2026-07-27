@@ -5,18 +5,10 @@
 
 namespace matching_engine {
 
-Trade::Trade(const TradeId id,
-             const OrderId buy_order_id,
-             const OrderId sell_order_id,
-             const Price price,
-             const Quantity quantity,
-             const SequenceNumber sequence)
-    : id_(id),
-      buy_order_id_(buy_order_id),
-      sell_order_id_(sell_order_id),
-      price_(price),
-      quantity_(quantity),
-      sequence_(sequence) {
+Trade::Trade(const TradeId id, const OrderId buy_order_id, const OrderId sell_order_id,
+             const Price price, const Quantity quantity, const SequenceNumber sequence)
+    : id_(id), buy_order_id_(buy_order_id), sell_order_id_(sell_order_id),
+      price_(price), quantity_(quantity), sequence_(sequence) {
     if (id_ == 0) {
         throw std::invalid_argument("trade ID must be positive");
     }
@@ -65,9 +57,8 @@ std::ostream& operator<<(std::ostream& output, const Trade& trade) {
     return output << "Trade{id=" << trade.id()
                   << ", buy_order_id=" << trade.buy_order_id()
                   << ", sell_order_id=" << trade.sell_order_id()
-                  << ", price=" << trade.price()
-                  << ", quantity=" << trade.quantity()
+                  << ", price=" << trade.price() << ", quantity=" << trade.quantity()
                   << ", sequence=" << trade.sequence() << '}';
 }
 
-}  // namespace matching_engine
+} // namespace matching_engine

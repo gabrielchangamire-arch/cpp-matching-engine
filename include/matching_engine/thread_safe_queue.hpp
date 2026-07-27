@@ -10,9 +10,8 @@
 
 namespace matching_engine {
 
-template <typename Value>
-class ThreadSafeQueue {
-public:
+template <typename Value> class ThreadSafeQueue {
+  public:
     explicit ThreadSafeQueue(const std::size_t capacity) : capacity_(capacity) {
         if (capacity_ == 0) {
             throw std::invalid_argument("queue capacity must be positive");
@@ -28,8 +27,7 @@ public:
 
     [[nodiscard]] bool push(Value value) {
         std::unique_lock lock{mutex_};
-        not_full_.wait(lock,
-                       [this] { return closed_ || values_.size() < capacity_; });
+        not_full_.wait(lock, [this] { return closed_ || values_.size() < capacity_; });
         if (closed_) {
             return false;
         }
@@ -56,7 +54,7 @@ public:
 
     void close() {
         {
-            std::lock_guard lock{mutex_};
+            std::scoped_lock lock{mutex_};
             closed_ = true;
         }
         not_empty_.notify_all();
@@ -64,16 +62,16 @@ public:
     }
 
     [[nodiscard]] bool is_closed() const {
-        std::lock_guard lock{mutex_};
+        std::scoped_lock lock{mutex_};
         return closed_;
     }
 
     [[nodiscard]] std::size_t size() const {
-        std::lock_guard lock{mutex_};
+        std::scoped_lock lock{mutex_};
         return values_.size();
     }
 
-private:
+  private:
     const std::size_t capacity_;
     mutable std::mutex mutex_;
     std::condition_variable not_empty_;
@@ -82,4 +80,4 @@ private:
     bool closed_{false};
 };
 
-}  // namespace matching_engine
+} // namespace matching_engine

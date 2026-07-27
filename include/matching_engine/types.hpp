@@ -27,4 +27,4 @@ enum class OrderType : std::uint8_t {
 std::ostream& operator<<(std::ostream& output, Side side);
 std::ostream& operator<<(std::ostream& output, OrderType order_type);
 
-}  // namespace matching_engine
+} // namespace matching_engine

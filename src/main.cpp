@@ -21,8 +21,8 @@ int main(const int argument_count, char* arguments[]) {
         matching_engine::process_csv_commands(input, engine, std::cout, std::cerr);
 
     std::cout << "\nProcessed " << summary.accepted + summary.rejected
-              << " commands: " << summary.accepted << " accepted, "
-              << summary.rejected << " rejected\n\n"
+              << " commands: " << summary.accepted << " accepted, " << summary.rejected
+              << " rejected\n\n"
               << engine.book();
 
     return summary.rejected == 0 ? 0 : 2;

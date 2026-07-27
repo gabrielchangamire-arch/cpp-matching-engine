@@ -24,4 +24,4 @@ struct CsvRunSummary {
                                                  std::ostream& output,
                                                  std::ostream& errors);
 
-}  // namespace matching_engine
+} // namespace matching_engine

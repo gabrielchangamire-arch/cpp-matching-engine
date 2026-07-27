@@ -1,7 +1,6 @@
 #include "matching_engine/matching_engine.hpp"
 
 #include <gtest/gtest.h>
-
 #include <limits>
 #include <stdexcept>
 
@@ -156,8 +155,7 @@ TEST(MatchingEngineTest, RejectsDuplicateActiveOrderId) {
     MatchingEngine engine;
     static_cast<void>(engine.submit_limit_order(1, Side::buy, 100, 1));
 
-    EXPECT_THROW(static_cast<void>(
-                     engine.submit_limit_order(1, Side::sell, 101, 1)),
+    EXPECT_THROW(static_cast<void>(engine.submit_limit_order(1, Side::sell, 101, 1)),
                  std::invalid_argument);
 }
 
@@ -166,8 +164,7 @@ TEST(MatchingEngineTest, RejectsReusedIdAfterCancellation) {
     static_cast<void>(engine.submit_limit_order(1, Side::buy, 100, 1));
     ASSERT_TRUE(engine.cancel(1));
 
-    EXPECT_THROW(static_cast<void>(
-                     engine.submit_limit_order(1, Side::buy, 100, 1)),
+    EXPECT_THROW(static_cast<void>(engine.submit_limit_order(1, Side::buy, 100, 1)),
                  std::invalid_argument);
 }
 
@@ -176,22 +173,18 @@ TEST(MatchingEngineTest, RejectsReusedIdAfterCompleteFill) {
     static_cast<void>(engine.submit_limit_order(1, Side::sell, 100, 1));
     static_cast<void>(engine.submit_limit_order(2, Side::buy, 100, 1));
 
-    EXPECT_THROW(static_cast<void>(
-                     engine.submit_limit_order(1, Side::sell, 100, 1)),
+    EXPECT_THROW(static_cast<void>(engine.submit_limit_order(1, Side::sell, 100, 1)),
                  std::invalid_argument);
 }
 
 TEST(MatchingEngineTest, InvalidSubmissionDoesNotReserveOrderId) {
     MatchingEngine engine;
 
-    EXPECT_THROW(static_cast<void>(
-                     engine.submit_limit_order(1, Side::buy, 0, 1)),
+    EXPECT_THROW(static_cast<void>(engine.submit_limit_order(1, Side::buy, 0, 1)),
                  std::invalid_argument);
-    EXPECT_THROW(static_cast<void>(
-                     engine.submit_limit_order(1, Side::buy, 100, 0)),
+    EXPECT_THROW(static_cast<void>(engine.submit_limit_order(1, Side::buy, 100, 0)),
                  std::invalid_argument);
-    EXPECT_NO_THROW(static_cast<void>(
-        engine.submit_limit_order(1, Side::buy, 100, 1)));
+    EXPECT_NO_THROW(static_cast<void>(engine.submit_limit_order(1, Side::buy, 100, 1)));
 }
 
 TEST(MatchingEngineTest, HandlesMaximumValidQuantity) {
@@ -212,5 +205,5 @@ TEST(MatchingEngineTest, UnknownCancellationReturnsFalseOnEmptyBook) {
     EXPECT_FALSE(engine.cancel(999));
 }
 
-}  // namespace
-}  // namespace matching_engine
+} // namespace
+} // namespace matching_engine

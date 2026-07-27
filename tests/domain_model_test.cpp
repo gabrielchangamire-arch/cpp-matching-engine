@@ -2,9 +2,8 @@
 #include "matching_engine/trade.hpp"
 #include "matching_engine/types.hpp"
 
-#include <gtest/gtest.h>
-
 #include <cstdint>
+#include <gtest/gtest.h>
 #include <sstream>
 #include <stdexcept>
 
@@ -21,11 +20,13 @@ TEST(TypesTest, FormatsLimitOrderType) {
 }
 
 TEST(TypesTest, RejectsUnknownSide) {
+    // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
     EXPECT_THROW(static_cast<void>(to_string(static_cast<Side>(255))),
                  std::invalid_argument);
 }
 
 TEST(TypesTest, RejectsUnknownOrderType) {
+    // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
     EXPECT_THROW(static_cast<void>(to_string(static_cast<OrderType>(255))),
                  std::invalid_argument);
 }
@@ -49,11 +50,13 @@ TEST(OrderTest, RejectsZeroId) {
 }
 
 TEST(OrderTest, RejectsUnknownSide) {
+    // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
     EXPECT_THROW((Order{1, static_cast<Side>(255), OrderType::limit, 100, 1, 1}),
                  std::invalid_argument);
 }
 
 TEST(OrderTest, RejectsUnknownOrderType) {
+    // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
     EXPECT_THROW((Order{1, Side::buy, static_cast<OrderType>(255), 100, 1, 1}),
                  std::invalid_argument);
 }
@@ -173,5 +176,5 @@ TEST(TradeTest, FormatsHumanReadableOutput) {
               "quantity=25, sequence=9}");
 }
 
-}  // namespace
-}  // namespace matching_engine
+} // namespace
+} // namespace matching_engine

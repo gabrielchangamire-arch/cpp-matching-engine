@@ -1,9 +1,8 @@
 #include "matching_engine/concurrent_matching_engine.hpp"
 
-#include <gtest/gtest.h>
-
 #include <array>
 #include <future>
+#include <gtest/gtest.h>
 #include <optional>
 #include <stdexcept>
 #include <thread>
@@ -32,14 +31,13 @@ TEST(ConcurrentMatchingEngineTest, ProcessesConcurrentProducersByExplicitSequenc
     producer_two.join();
     producer_three.join();
 
+    // All producers have joined, so each fixed slot has been populated.
+    // NOLINTBEGIN(bugprone-unchecked-optional-access)
     std::array<CommandResult, 6> results{
-        futures[0]->get(),
-        futures[1]->get(),
-        futures[2]->get(),
-        futures[3]->get(),
-        futures[4]->get(),
-        futures[5]->get(),
+        futures[0].value().get(), futures[1].value().get(), futures[2].value().get(),
+        futures[3].value().get(), futures[4].value().get(), futures[5].value().get(),
     };
+    // NOLINTEND(bugprone-unchecked-optional-access)
     engine.shutdown();
 
     for (std::size_t index = 0; index < results.size(); ++index) {
@@ -51,18 +49,16 @@ TEST(ConcurrentMatchingEngineTest, ProcessesConcurrentProducersByExplicitSequenc
     EXPECT_EQ(results[3].trades[1].sell_order_id(), 2U);
     ASSERT_EQ(results[4].trades.size(), 1U);
     EXPECT_EQ(results[4].trades[0].buy_order_id(), 3U);
-    EXPECT_EQ(engine.book_snapshot(),
-              "Order book (1 order)\n"
-              "ASKS (best first)\n"
-              "  9900 | qty 2 | orders 1\n"
-              "BIDS (best first)\n"
-              "  (empty)\n");
+    EXPECT_EQ(engine.book_snapshot(), "Order book (1 order)\n"
+                                      "ASKS (best first)\n"
+                                      "  9900 | qty 2 | orders 1\n"
+                                      "BIDS (best first)\n"
+                                      "  (empty)\n");
 }
 
 TEST(ConcurrentMatchingEngineTest, ReturnsCommandValidationErrorsThroughFuture) {
     ConcurrentMatchingEngine engine{2};
-    auto invalid_add =
-        engine.submit(1, AddCommand{1, Side::buy, 0, 1});
+    auto invalid_add = engine.submit(1, AddCommand{1, Side::buy, 0, 1});
     auto unknown_cancel = engine.submit(2, CancelCommand{999});
 
     const auto add_result = invalid_add.get();
@@ -79,11 +75,9 @@ TEST(ConcurrentMatchingEngineTest, RejectsInvalidAndDuplicateIngestionSequences)
     ConcurrentMatchingEngine engine{2};
     auto first = engine.submit(1, AddCommand{1, Side::buy, 100, 1});
 
-    EXPECT_THROW(static_cast<void>(
-                     engine.submit(0, AddCommand{2, Side::buy, 100, 1})),
+    EXPECT_THROW(static_cast<void>(engine.submit(0, AddCommand{2, Side::buy, 100, 1})),
                  std::invalid_argument);
-    EXPECT_THROW(static_cast<void>(
-                     engine.submit(1, AddCommand{2, Side::buy, 100, 1})),
+    EXPECT_THROW(static_cast<void>(engine.submit(1, AddCommand{2, Side::buy, 100, 1})),
                  std::invalid_argument);
     EXPECT_TRUE(first.get().accepted);
     engine.shutdown();
@@ -104,11 +98,9 @@ TEST(ConcurrentMatchingEngineTest, RejectsSubmissionAndAllowsSnapshotAfterShutdo
     ConcurrentMatchingEngine engine{1};
     engine.shutdown();
 
-    EXPECT_THROW(static_cast<void>(
-                     engine.submit(1, AddCommand{1, Side::buy, 100, 1})),
+    EXPECT_THROW(static_cast<void>(engine.submit(1, AddCommand{1, Side::buy, 100, 1})),
                  std::runtime_error);
-    EXPECT_NE(engine.book_snapshot().find("Order book (0 orders)"),
-              std::string::npos);
+    EXPECT_NE(engine.book_snapshot().find("Order book (0 orders)"), std::string::npos);
 }
 
 TEST(ConcurrentMatchingEngineTest, SnapshotBeforeShutdownIsRejected) {
@@ -118,5 +110,5 @@ TEST(ConcurrentMatchingEngineTest, SnapshotBeforeShutdownIsRejected) {
     engine.shutdown();
 }
 
-}  // namespace
-}  // namespace matching_engine
+} // namespace
+} // namespace matching_engine

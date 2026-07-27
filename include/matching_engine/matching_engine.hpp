@@ -10,18 +10,15 @@
 namespace matching_engine {
 
 class MatchingEngine {
-public:
-    [[nodiscard]] std::vector<Trade> submit_limit_order(OrderId order_id,
-                                                        Side side,
-                                                        Price price,
-                                                        Quantity quantity);
+  public:
+    [[nodiscard]] std::vector<Trade> submit_limit_order(OrderId order_id, Side side,
+                                                        Price price, Quantity quantity);
     [[nodiscard]] bool cancel(OrderId order_id);
 
     [[nodiscard]] const OrderBook& book() const noexcept;
 
-private:
-    [[nodiscard]] static bool crosses(const Order& incoming,
-                                      const Order& resting);
+  private:
+    [[nodiscard]] static bool crosses(const Order& incoming, const Order& resting);
     void ensure_sequence_available() const;
     void ensure_trade_id_available() const;
 
@@ -31,4 +28,4 @@ private:
     TradeId next_trade_id_{1};
 };
 
-}  // namespace matching_engine
+} // namespace matching_engine

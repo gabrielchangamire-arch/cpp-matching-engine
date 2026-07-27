@@ -26,7 +26,7 @@ struct BookLevel {
 };
 
 class OrderBook {
-public:
+  public:
     OrderBook() = default;
     ~OrderBook() = default;
 
@@ -46,14 +46,14 @@ public:
                                                std::size_t max_levels = 0) const;
     [[nodiscard]] std::string snapshot() const;
 
-private:
+  private:
     struct PriceLevel {
         std::list<Order> orders;
         Quantity total_quantity{0};
     };
 
-    using BidLevels = std::map<Price, PriceLevel, std::greater<Price>>;
-    using AskLevels = std::map<Price, PriceLevel, std::less<Price>>;
+    using BidLevels = std::map<Price, PriceLevel, std::greater<>>;
+    using AskLevels = std::map<Price, PriceLevel, std::less<>>;
     using OrderIterator = std::list<Order>::iterator;
 
     struct OrderLocation {
@@ -75,4 +75,4 @@ private:
 std::ostream& operator<<(std::ostream& output, const BookLevel& level);
 std::ostream& operator<<(std::ostream& output, const OrderBook& book);
 
-}  // namespace matching_engine
+} // namespace matching_engine

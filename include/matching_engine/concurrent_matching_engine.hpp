@@ -26,7 +26,7 @@ struct CommandResult {
 };
 
 class ConcurrentMatchingEngine {
-public:
+  public:
     explicit ConcurrentMatchingEngine(std::size_t queue_capacity);
     ~ConcurrentMatchingEngine();
 
@@ -35,14 +35,13 @@ public:
     ConcurrentMatchingEngine(ConcurrentMatchingEngine&&) = delete;
     ConcurrentMatchingEngine& operator=(ConcurrentMatchingEngine&&) = delete;
 
-    [[nodiscard]] std::future<CommandResult> submit(
-        IngestionSequence ingestion_sequence,
-        Command command);
+    [[nodiscard]] std::future<CommandResult>
+    submit(IngestionSequence ingestion_sequence, Command command);
 
     void shutdown();
     [[nodiscard]] std::string book_snapshot() const;
 
-private:
+  private:
     struct Envelope {
         IngestionSequence ingestion_sequence;
         Command command;
@@ -64,4 +63,4 @@ private:
     std::thread worker_;
 };
 
-}  // namespace matching_engine
+} // namespace matching_engine

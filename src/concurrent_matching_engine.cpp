@@ -14,15 +14,15 @@ ConcurrentMatchingEngine::~ConcurrentMatchingEngine() {
     shutdown();
 }
 
-std::future<CommandResult> ConcurrentMatchingEngine::submit(
-    const IngestionSequence ingestion_sequence,
-    Command command) {
+std::future<CommandResult>
+ConcurrentMatchingEngine::submit(const IngestionSequence ingestion_sequence,
+                                 Command command) {
     if (ingestion_sequence == 0) {
         throw std::invalid_argument("ingestion sequence must be positive");
     }
 
     {
-        std::lock_guard lock{state_mutex_};
+        std::scoped_lock lock{state_mutex_};
         if (!accepting_) {
             throw std::runtime_error("concurrent matching engine is shut down");
         }
@@ -31,10 +31,10 @@ std::future<CommandResult> ConcurrentMatchingEngine::submit(
         }
     }
 
-    Envelope envelope{ingestion_sequence, std::move(command), {}};
+    Envelope envelope{ingestion_sequence, command, {}};
     std::future<CommandResult> result = envelope.completion.get_future();
     if (!queue_.push(std::move(envelope))) {
-        std::lock_guard lock{state_mutex_};
+        std::scoped_lock lock{state_mutex_};
         submitted_sequences_.erase(ingestion_sequence);
         throw std::runtime_error("concurrent matching engine stopped accepting");
     }
@@ -42,9 +42,9 @@ std::future<CommandResult> ConcurrentMatchingEngine::submit(
 }
 
 void ConcurrentMatchingEngine::shutdown() {
-    std::lock_guard shutdown_lock{shutdown_mutex_};
+    std::scoped_lock shutdown_lock{shutdown_mutex_};
     {
-        std::lock_guard lock{state_mutex_};
+        std::scoped_lock lock{state_mutex_};
         if (!accepting_ && worker_finished_) {
             return;
         }
@@ -57,13 +57,13 @@ void ConcurrentMatchingEngine::shutdown() {
     }
 
     {
-        std::lock_guard lock{state_mutex_};
+        std::scoped_lock lock{state_mutex_};
         worker_finished_ = true;
     }
 }
 
 std::string ConcurrentMatchingEngine::book_snapshot() const {
-    std::lock_guard lock{state_mutex_};
+    std::scoped_lock lock{state_mutex_};
     if (!worker_finished_) {
         throw std::logic_error("book snapshot requires completed shutdown");
     }
@@ -93,8 +93,7 @@ void ConcurrentMatchingEngine::run() {
 
     for (auto& [sequence, envelope] : pending) {
         static_cast<void>(sequence);
-        reject(std::move(envelope),
-               "missing an earlier contiguous ingestion sequence");
+        reject(std::move(envelope), "missing an earlier contiguous ingestion sequence");
     }
 }
 
@@ -105,10 +104,9 @@ void ConcurrentMatchingEngine::process(Envelope envelope) {
             [this, &result](const auto& command) {
                 using CommandType = std::decay_t<decltype(command)>;
                 if constexpr (std::is_same_v<CommandType, AddCommand>) {
-                    result.trades = engine_.submit_limit_order(command.order_id,
-                                                                command.side,
-                                                                command.price,
-                                                                command.quantity);
+                    result.trades =
+                        engine_.submit_limit_order(command.order_id, command.side,
+                                                   command.price, command.quantity);
                 } else {
                     if (!engine_.cancel(command.order_id)) {
                         throw std::invalid_argument(
@@ -125,10 +123,8 @@ void ConcurrentMatchingEngine::process(Envelope envelope) {
 }
 
 void ConcurrentMatchingEngine::reject(Envelope envelope, std::string error) {
-    envelope.completion.set_value(CommandResult{envelope.ingestion_sequence,
-                                                 false,
-                                                 {},
-                                                 std::move(error)});
+    envelope.completion.set_value(
+        CommandResult{envelope.ingestion_sequence, false, {}, std::move(error)});
 }
 
-}  // namespace matching_engine
+} // namespace matching_engine

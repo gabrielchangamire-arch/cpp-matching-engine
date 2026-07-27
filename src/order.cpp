@@ -5,19 +5,10 @@
 
 namespace matching_engine {
 
-Order::Order(const OrderId id,
-             const Side side,
-             const OrderType type,
-             const Price price,
-             const Quantity quantity,
-             const SequenceNumber sequence)
-    : id_(id),
-      side_(side),
-      type_(type),
-      price_(price),
-      quantity_(quantity),
-      remaining_quantity_(quantity),
-      sequence_(sequence) {
+Order::Order(const OrderId id, const Side side, const OrderType type, const Price price,
+             const Quantity quantity, const SequenceNumber sequence)
+    : id_(id), side_(side), type_(type), price_(price), quantity_(quantity),
+      remaining_quantity_(quantity), sequence_(sequence) {
     if (id_ == 0) {
         throw std::invalid_argument("order ID must be positive");
     }
@@ -85,4 +76,4 @@ std::ostream& operator<<(std::ostream& output, const Order& order) {
                   << ", sequence=" << order.sequence() << '}';
 }
 
-}  // namespace matching_engine
+} // namespace matching_engine

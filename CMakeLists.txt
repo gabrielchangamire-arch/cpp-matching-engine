@@ -10,6 +10,35 @@ project(
 find_package(Threads REQUIRED)
 
 option(MATCHING_ENGINE_BUILD_BENCHMARKS "Build Google Benchmark targets" OFF)
+option(MATCHING_ENGINE_ENABLE_ASAN_UBSAN "Enable AddressSanitizer and UBSan" OFF)
+option(MATCHING_ENGINE_ENABLE_TSAN "Enable ThreadSanitizer" OFF)
+option(MATCHING_ENGINE_ENABLE_CLANG_TIDY "Run clang-tidy during compilation" OFF)
+
+if(MATCHING_ENGINE_ENABLE_ASAN_UBSAN AND MATCHING_ENGINE_ENABLE_TSAN)
+    message(FATAL_ERROR "ASan/UBSan and TSan require separate build trees")
+endif()
+
+if(MATCHING_ENGINE_ENABLE_ASAN_UBSAN OR MATCHING_ENGINE_ENABLE_TSAN)
+    if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+        message(FATAL_ERROR "Configured sanitizers require Clang or GCC")
+    endif()
+
+    if(MATCHING_ENGINE_ENABLE_ASAN_UBSAN)
+        set(MATCHING_ENGINE_SANITIZERS "address,undefined")
+    else()
+        set(MATCHING_ENGINE_SANITIZERS "thread")
+    endif()
+
+    add_compile_options(
+        -fsanitize=${MATCHING_ENGINE_SANITIZERS}
+        -fno-omit-frame-pointer
+    )
+    add_link_options(-fsanitize=${MATCHING_ENGINE_SANITIZERS})
+endif()
+
+if(MATCHING_ENGINE_ENABLE_CLANG_TIDY)
+    find_program(MATCHING_ENGINE_CLANG_TIDY_EXECUTABLE NAMES clang-tidy REQUIRED)
+endif()
 
 function(enable_strict_warnings target_name)
     if(MSVC)
@@ -22,6 +51,17 @@ function(enable_strict_warnings target_name)
                 -Wextra
                 -Wpedantic
                 -Werror
+        )
+    endif()
+endfunction()
+
+function(enable_clang_tidy target_name)
+    if(MATCHING_ENGINE_ENABLE_CLANG_TIDY)
+        set_target_properties(
+            ${target_name}
+            PROPERTIES
+                CXX_CLANG_TIDY
+                    "${MATCHING_ENGINE_CLANG_TIDY_EXECUTABLE};--warnings-as-errors=*"
         )
     endif()
 endfunction()
@@ -46,11 +86,40 @@ target_include_directories(
 )
 set_target_properties(matching_engine PROPERTIES CXX_EXTENSIONS OFF)
 enable_strict_warnings(matching_engine)
+enable_clang_tidy(matching_engine)
 
 add_executable(matching_engine_cli src/main.cpp)
 target_link_libraries(matching_engine_cli PRIVATE matching_engine)
 set_target_properties(matching_engine_cli PROPERTIES CXX_EXTENSIONS OFF)
 enable_strict_warnings(matching_engine_cli)
+enable_clang_tidy(matching_engine_cli)
+
+find_program(MATCHING_ENGINE_CLANG_FORMAT_EXECUTABLE NAMES clang-format)
+if(MATCHING_ENGINE_CLANG_FORMAT_EXECUTABLE)
+    file(
+        GLOB_RECURSE MATCHING_ENGINE_FORMAT_FILES
+        CONFIGURE_DEPENDS
+        ${CMAKE_CURRENT_SOURCE_DIR}/benchmarks/*.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/*.cpp
+    )
+    add_custom_target(
+        format
+        COMMAND ${MATCHING_ENGINE_CLANG_FORMAT_EXECUTABLE}
+                -i
+                ${MATCHING_ENGINE_FORMAT_FILES}
+        COMMENT "Formatting project C++ sources"
+    )
+    add_custom_target(
+        format-check
+        COMMAND ${MATCHING_ENGINE_CLANG_FORMAT_EXECUTABLE}
+                --dry-run
+                --Werror
+                ${MATCHING_ENGINE_FORMAT_FILES}
+        COMMENT "Checking C++ source formatting"
+    )
+endif()
 
 include(CTest)
 if(BUILD_TESTING)
@@ -83,6 +152,7 @@ if(BUILD_TESTING)
         )
         set_target_properties(${target_name} PROPERTIES CXX_EXTENSIONS OFF)
         enable_strict_warnings(${target_name})
+        enable_clang_tidy(${target_name})
         gtest_discover_tests(${target_name})
     endfunction()
 
@@ -125,4 +195,5 @@ if(MATCHING_ENGINE_BUILD_BENCHMARKS)
         PROPERTIES CXX_EXTENSIONS OFF
     )
     enable_strict_warnings(matching_engine_benchmark)
+    enable_clang_tidy(matching_engine_benchmark)
 endif()

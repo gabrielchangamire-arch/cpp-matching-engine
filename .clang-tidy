@@ -1,0 +1,15 @@
+---
+Checks: >
+  -*,
+  clang-analyzer-*,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  performance-*,
+  portability-*,
+  -portability-avoid-pragma-once,
+  modernize-use-scoped-lock,
+  modernize-use-transparent-functors
+WarningsAsErrors: '*'
+HeaderFilterRegex: '.*(include|src|tests|benchmarks)/.*'
+FormatStyle: file
+...

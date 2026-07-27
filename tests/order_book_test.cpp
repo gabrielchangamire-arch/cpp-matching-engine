@@ -1,7 +1,6 @@
 #include "matching_engine/order_book.hpp"
 
 #include <gtest/gtest.h>
-
 #include <limits>
 #include <stdexcept>
 #include <string>
@@ -11,11 +10,8 @@
 namespace matching_engine {
 namespace {
 
-Order make_order(const OrderId id,
-                 const Side side,
-                 const Price price,
-                 const Quantity quantity,
-                 const SequenceNumber sequence = 1) {
+Order make_order(const OrderId id, const Side side, const Price price,
+                 const Quantity quantity, const SequenceNumber sequence = 1) {
     return Order{id, side, OrderType::limit, price, quantity, sequence};
 }
 
@@ -85,8 +81,7 @@ TEST(OrderBookTest, DetectsDuplicateActiveIdWithoutChangingBook) {
     OrderBook book;
     book.add(make_order(1, Side::buy, 100, 3));
 
-    EXPECT_THROW(book.add(make_order(1, Side::sell, 101, 9)),
-                 std::invalid_argument);
+    EXPECT_THROW(book.add(make_order(1, Side::sell, 101, 9)), std::invalid_argument);
     EXPECT_EQ(book.order_count(), 1U);
     EXPECT_EQ(book.best_bid(), (BookLevel{100, 3, 1}));
     EXPECT_FALSE(book.best_ask().has_value());
@@ -134,18 +129,16 @@ TEST(OrderBookTest, AggregatesOnlyRemainingQuantity) {
     partially_filled.apply_fill(4);
     OrderBook book;
 
-    book.add(std::move(partially_filled));
+    book.add(partially_filled);
 
     EXPECT_EQ(book.best_bid(), (BookLevel{100, 6, 1}));
 }
 
 TEST(OrderBookTest, RejectsPriceLevelQuantityOverflow) {
     OrderBook book;
-    book.add(make_order(
-        1, Side::buy, 100, std::numeric_limits<Quantity>::max()));
+    book.add(make_order(1, Side::buy, 100, std::numeric_limits<Quantity>::max()));
 
-    EXPECT_THROW(book.add(make_order(2, Side::buy, 100, 1, 2)),
-                 std::overflow_error);
+    EXPECT_THROW(book.add(make_order(2, Side::buy, 100, 1, 2)), std::overflow_error);
     EXPECT_EQ(book.order_count(), 1U);
     EXPECT_FALSE(book.contains(2));
 }
@@ -153,6 +146,7 @@ TEST(OrderBookTest, RejectsPriceLevelQuantityOverflow) {
 TEST(OrderBookTest, RejectsInvalidDepthSide) {
     const OrderBook book;
 
+    // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
     EXPECT_THROW(static_cast<void>(book.depth(static_cast<Side>(255))),
                  std::invalid_argument);
 }
@@ -162,13 +156,12 @@ TEST(OrderBookTest, PrintsReadableSnapshot) {
     book.add(make_order(1, Side::buy, 10'000, 5));
     book.add(make_order(2, Side::sell, 10'100, 7, 2));
 
-    EXPECT_EQ(book.snapshot(),
-              "Order book (2 orders)\n"
-              "ASKS (best first)\n"
-              "  10100 | qty 7 | orders 1\n"
-              "BIDS (best first)\n"
-              "  10000 | qty 5 | orders 1\n");
+    EXPECT_EQ(book.snapshot(), "Order book (2 orders)\n"
+                               "ASKS (best first)\n"
+                               "  10100 | qty 7 | orders 1\n"
+                               "BIDS (best first)\n"
+                               "  10000 | qty 5 | orders 1\n");
 }
 
-}  // namespace
-}  // namespace matching_engine
+} // namespace
+} // namespace matching_engine

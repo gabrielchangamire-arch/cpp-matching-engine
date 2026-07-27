@@ -7,12 +7,8 @@
 namespace matching_engine {
 
 class Order {
-public:
-    Order(OrderId id,
-          Side side,
-          OrderType type,
-          Price price,
-          Quantity quantity,
+  public:
+    Order(OrderId id, Side side, OrderType type, Price price, Quantity quantity,
           SequenceNumber sequence);
 
     [[nodiscard]] OrderId id() const noexcept;
@@ -26,7 +22,7 @@ public:
 
     void apply_fill(Quantity fill_quantity);
 
-private:
+  private:
     OrderId id_;
     Side side_;
     OrderType type_;
@@ -38,4 +34,4 @@ private:
 
 std::ostream& operator<<(std::ostream& output, const Order& order);
 
-}  // namespace matching_engine
+} // namespace matching_engine

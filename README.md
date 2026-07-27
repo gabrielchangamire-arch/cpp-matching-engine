@@ -42,6 +42,30 @@ cmake --build build-release --target matching_engine_benchmark --parallel
 ./build-release/matching_engine_benchmark
 ```
 
+## Quality checks
+
+```sh
+# Formatting (requires clang-format)
+cmake --build build --target format-check
+
+# AddressSanitizer and UndefinedBehaviorSanitizer
+cmake -S . -B build-asan -DCMAKE_BUILD_TYPE=Debug \
+  -DMATCHING_ENGINE_ENABLE_ASAN_UBSAN=ON
+cmake --build build-asan --parallel
+ctest --test-dir build-asan --output-on-failure
+
+# ThreadSanitizer (use a separate build tree)
+cmake -S . -B build-tsan -DCMAKE_BUILD_TYPE=Debug \
+  -DMATCHING_ENGINE_ENABLE_TSAN=ON
+cmake --build build-tsan --parallel
+ctest --test-dir build-tsan --output-on-failure
+
+# Static analysis (requires clang-tidy)
+cmake -S . -B build-tidy -DCMAKE_BUILD_TYPE=Debug \
+  -DMATCHING_ENGINE_ENABLE_CLANG_TIDY=ON
+cmake --build build-tidy --parallel
+```
+
 ## Domain representation
 
 Prices use signed 64-bit integer ticks rather than floating point. Quantities

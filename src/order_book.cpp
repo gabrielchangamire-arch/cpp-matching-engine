@@ -32,8 +32,7 @@ void OrderBook::add(Order order) {
         try {
             locations_.emplace(inserted_order->id(),
                                OrderLocation{inserted_order->side(),
-                                             inserted_order->price(),
-                                             inserted_order});
+                                             inserted_order->price(), inserted_order});
         } catch (...) {
             level->second.orders.pop_back();
             if (level->second.orders.empty()) {
@@ -46,12 +45,12 @@ void OrderBook::add(Order order) {
     };
 
     switch (order.side()) {
-        case Side::buy:
-            add_to_levels(bids_);
-            return;
-        case Side::sell:
-            add_to_levels(asks_);
-            return;
+    case Side::buy:
+        add_to_levels(bids_);
+        return;
+    case Side::sell:
+        add_to_levels(asks_);
+        return;
     }
 
     throw std::invalid_argument("invalid order side");
@@ -69,8 +68,7 @@ bool OrderBook::cancel(const OrderId order_id) {
             throw std::logic_error("order location references a missing level");
         }
 
-        level->second.total_quantity -=
-            location->second.order->remaining_quantity();
+        level->second.total_quantity -= location->second.order->remaining_quantity();
         level->second.orders.erase(location->second.order);
         if (level->second.orders.empty()) {
             levels.erase(level);
@@ -78,12 +76,12 @@ bool OrderBook::cancel(const OrderId order_id) {
     };
 
     switch (location->second.side) {
-        case Side::buy:
-            erase_from_levels(bids_);
-            break;
-        case Side::sell:
-            erase_from_levels(asks_);
-            break;
+    case Side::buy:
+        erase_from_levels(bids_);
+        break;
+    case Side::sell:
+        erase_from_levels(asks_);
+        break;
     }
 
     locations_.erase(location);
@@ -135,12 +133,12 @@ std::vector<BookLevel> OrderBook::depth(const Side side,
     };
 
     switch (side) {
-        case Side::buy:
-            append_levels(bids_);
-            return result;
-        case Side::sell:
-            append_levels(asks_);
-            return result;
+    case Side::buy:
+        append_levels(bids_);
+        return result;
+    case Side::sell:
+        append_levels(asks_);
+        return result;
     }
 
     throw std::invalid_argument("invalid order side");
@@ -176,10 +174,10 @@ std::string OrderBook::snapshot() const {
 
 Order* OrderBook::best_order(const Side side) {
     switch (side) {
-        case Side::buy:
-            return bids_.empty() ? nullptr : &bids_.begin()->second.orders.front();
-        case Side::sell:
-            return asks_.empty() ? nullptr : &asks_.begin()->second.orders.front();
+    case Side::buy:
+        return bids_.empty() ? nullptr : &bids_.begin()->second.orders.front();
+    case Side::sell:
+        return asks_.empty() ? nullptr : &asks_.begin()->second.orders.front();
     }
 
     throw std::invalid_argument("invalid order side");
@@ -210,12 +208,12 @@ void OrderBook::fill(const OrderId order_id, const Quantity quantity) {
     };
 
     switch (location->second.side) {
-        case Side::buy:
-            fill_in_levels(bids_);
-            return;
-        case Side::sell:
-            fill_in_levels(asks_);
-            return;
+    case Side::buy:
+        fill_in_levels(bids_);
+        return;
+    case Side::sell:
+        fill_in_levels(asks_);
+        return;
     }
 
     throw std::logic_error("order location contains an invalid side");
@@ -230,4 +228,4 @@ std::ostream& operator<<(std::ostream& output, const OrderBook& book) {
     return output << book.snapshot();
 }
 
-}  // namespace matching_engine
+} // namespace matching_engine

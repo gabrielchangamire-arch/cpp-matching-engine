@@ -8,16 +8,15 @@
 namespace matching_engine {
 
 std::vector<Trade> MatchingEngine::submit_limit_order(const OrderId order_id,
-                                                       const Side side,
-                                                       const Price price,
-                                                       const Quantity quantity) {
+                                                      const Side side,
+                                                      const Price price,
+                                                      const Quantity quantity) {
     if (seen_order_ids_.contains(order_id)) {
         throw std::invalid_argument("duplicate order ID");
     }
     ensure_sequence_available();
 
-    Order incoming{
-        order_id, side, OrderType::limit, price, quantity, next_sequence_};
+    Order incoming{order_id, side, OrderType::limit, price, quantity, next_sequence_};
 
     seen_order_ids_.insert(order_id);
     ++next_sequence_;
@@ -26,8 +25,7 @@ std::vector<Trade> MatchingEngine::submit_limit_order(const OrderId order_id,
 
     const Side resting_side = side == Side::buy ? Side::sell : Side::buy;
     Order* resting = book_.best_order(resting_side);
-    bool has_crossing_order =
-        resting != nullptr && crosses(incoming, *resting);
+    bool has_crossing_order = resting != nullptr && crosses(incoming, *resting);
     if (has_crossing_order) {
         trades.reserve(book_.order_count());
     }
@@ -38,37 +36,29 @@ std::vector<Trade> MatchingEngine::submit_limit_order(const OrderId order_id,
         ensure_trade_id_available();
 
         const Quantity executed_quantity =
-            std::min(incoming.remaining_quantity(),
-                     resting->remaining_quantity());
+            std::min(incoming.remaining_quantity(), resting->remaining_quantity());
         const OrderId resting_id = resting->id();
         const Price execution_price = resting->price();
-        const OrderId buy_order_id =
-            side == Side::buy ? incoming.id() : resting_id;
-        const OrderId sell_order_id =
-            side == Side::sell ? incoming.id() : resting_id;
+        const OrderId buy_order_id = side == Side::buy ? incoming.id() : resting_id;
+        const OrderId sell_order_id = side == Side::sell ? incoming.id() : resting_id;
 
-        Trade trade{next_trade_id_,
-                    buy_order_id,
-                    sell_order_id,
-                    execution_price,
-                    executed_quantity,
-                    next_sequence_};
+        Trade trade{next_trade_id_,  buy_order_id,      sell_order_id,
+                    execution_price, executed_quantity, next_sequence_};
 
         incoming.apply_fill(executed_quantity);
         book_.fill(resting_id, executed_quantity);
-        trades.push_back(std::move(trade));
+        trades.push_back(trade);
         ++next_trade_id_;
         ++next_sequence_;
 
         if (!incoming.is_filled()) {
             resting = book_.best_order(resting_side);
-            has_crossing_order =
-                resting != nullptr && crosses(incoming, *resting);
+            has_crossing_order = resting != nullptr && crosses(incoming, *resting);
         }
     }
 
     if (!incoming.is_filled()) {
-        book_.add(std::move(incoming));
+        book_.add(incoming);
     }
 
     return trades;
@@ -84,10 +74,10 @@ const OrderBook& MatchingEngine::book() const noexcept {
 
 bool MatchingEngine::crosses(const Order& incoming, const Order& resting) {
     switch (incoming.side()) {
-        case Side::buy:
-            return incoming.price() >= resting.price();
-        case Side::sell:
-            return incoming.price() <= resting.price();
+    case Side::buy:
+        return incoming.price() >= resting.price();
+    case Side::sell:
+        return incoming.price() <= resting.price();
     }
 
     throw std::logic_error("incoming order contains an invalid side");
@@ -105,4 +95,4 @@ void MatchingEngine::ensure_trade_id_available() const {
     }
 }
 
-}  // namespace matching_engine
+} // namespace matching_engine
