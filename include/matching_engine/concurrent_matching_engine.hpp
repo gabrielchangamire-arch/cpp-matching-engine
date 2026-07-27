@@ -27,7 +27,11 @@ struct CommandResult {
 
 class ConcurrentMatchingEngine {
   public:
-    explicit ConcurrentMatchingEngine(std::size_t queue_capacity);
+    static constexpr IngestionSequence default_max_sequence_gap{1'024};
+
+    explicit ConcurrentMatchingEngine(
+        std::size_t queue_capacity,
+        IngestionSequence max_sequence_gap = default_max_sequence_gap);
     ~ConcurrentMatchingEngine();
 
     ConcurrentMatchingEngine(const ConcurrentMatchingEngine&) = delete;
@@ -54,10 +58,12 @@ class ConcurrentMatchingEngine {
 
     ThreadSafeQueue<Envelope> queue_;
     MatchingEngine engine_;
+    const IngestionSequence max_sequence_gap_;
 
     mutable std::mutex shutdown_mutex_;
     mutable std::mutex state_mutex_;
     std::unordered_set<IngestionSequence> submitted_sequences_;
+    IngestionSequence next_ingestion_sequence_{1};
     bool accepting_{true};
     bool worker_finished_{false};
     std::thread worker_;

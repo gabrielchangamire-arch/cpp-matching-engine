@@ -83,6 +83,35 @@ TEST(ConcurrentMatchingEngineTest, RejectsInvalidAndDuplicateIngestionSequences)
     engine.shutdown();
 }
 
+TEST(ConcurrentMatchingEngineTest, RejectsSequencesBeyondConfiguredGap) {
+    ConcurrentMatchingEngine engine{4, 2};
+
+    EXPECT_THROW(static_cast<void>(engine.submit(4, AddCommand{4, Side::buy, 100, 1})),
+                 std::out_of_range);
+
+    auto third = engine.submit(3, AddCommand{3, Side::buy, 100, 1});
+    auto first = engine.submit(1, AddCommand{1, Side::buy, 100, 1});
+    auto second = engine.submit(2, AddCommand{2, Side::buy, 100, 1});
+
+    EXPECT_TRUE(first.get().accepted);
+    EXPECT_TRUE(second.get().accepted);
+    EXPECT_TRUE(third.get().accepted);
+    engine.shutdown();
+}
+
+TEST(ConcurrentMatchingEngineTest, RejectsProcessedSequenceAsStale) {
+    ConcurrentMatchingEngine engine{1, 1};
+    auto first = engine.submit(1, AddCommand{1, Side::buy, 100, 1});
+    ASSERT_TRUE(first.get().accepted);
+
+    EXPECT_THROW(static_cast<void>(engine.submit(1, AddCommand{2, Side::buy, 100, 1})),
+                 std::invalid_argument);
+
+    auto second = engine.submit(2, AddCommand{2, Side::buy, 100, 1});
+    EXPECT_TRUE(second.get().accepted);
+    engine.shutdown();
+}
+
 TEST(ConcurrentMatchingEngineTest, RejectsPendingCommandsWhenSequenceHasGap) {
     ConcurrentMatchingEngine engine{1};
     auto future = engine.submit(2, AddCommand{2, Side::buy, 100, 1});

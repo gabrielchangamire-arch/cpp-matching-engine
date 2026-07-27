@@ -1,5 +1,6 @@
 #include "matching_engine/concurrent_matching_engine.hpp"
 
+#include <limits>
 #include <map>
 #include <stdexcept>
 #include <type_traits>
@@ -7,8 +8,10 @@
 
 namespace matching_engine {
 
-ConcurrentMatchingEngine::ConcurrentMatchingEngine(const std::size_t queue_capacity)
-    : queue_(queue_capacity), worker_(&ConcurrentMatchingEngine::run, this) {}
+ConcurrentMatchingEngine::ConcurrentMatchingEngine(
+    const std::size_t queue_capacity, const IngestionSequence max_sequence_gap)
+    : queue_(queue_capacity), max_sequence_gap_(max_sequence_gap),
+      worker_(&ConcurrentMatchingEngine::run, this) {}
 
 ConcurrentMatchingEngine::~ConcurrentMatchingEngine() {
     shutdown();
@@ -25,6 +28,12 @@ ConcurrentMatchingEngine::submit(const IngestionSequence ingestion_sequence,
         std::scoped_lock lock{state_mutex_};
         if (!accepting_) {
             throw std::runtime_error("concurrent matching engine is shut down");
+        }
+        if (ingestion_sequence < next_ingestion_sequence_) {
+            throw std::invalid_argument("stale ingestion sequence");
+        }
+        if (ingestion_sequence - next_ingestion_sequence_ > max_sequence_gap_) {
+            throw std::out_of_range("ingestion sequence exceeds the configured gap");
         }
         if (!submitted_sequences_.insert(ingestion_sequence).second) {
             throw std::invalid_argument("duplicate ingestion sequence");
@@ -79,8 +88,24 @@ void ConcurrentMatchingEngine::run() {
         if (ready != pending.end()) {
             Envelope envelope = std::move(ready->second);
             pending.erase(ready);
+            const IngestionSequence processed_sequence = envelope.ingestion_sequence;
             process(std::move(envelope));
-            ++next_sequence;
+
+            bool sequence_space_exhausted = false;
+            {
+                std::scoped_lock lock{state_mutex_};
+                submitted_sequences_.erase(processed_sequence);
+                if (next_sequence == std::numeric_limits<IngestionSequence>::max()) {
+                    accepting_ = false;
+                    sequence_space_exhausted = true;
+                } else {
+                    ++next_sequence;
+                    next_ingestion_sequence_ = next_sequence;
+                }
+            }
+            if (sequence_space_exhausted) {
+                queue_.close();
+            }
             continue;
         }
 
@@ -92,7 +117,10 @@ void ConcurrentMatchingEngine::run() {
     }
 
     for (auto& [sequence, envelope] : pending) {
-        static_cast<void>(sequence);
+        {
+            std::scoped_lock lock{state_mutex_};
+            submitted_sequences_.erase(sequence);
+        }
         reject(std::move(envelope), "missing an earlier contiguous ingestion sequence");
     }
 }
