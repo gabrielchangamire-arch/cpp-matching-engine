@@ -26,7 +26,7 @@ void OrderBook::add(Order order) {
             throw std::overflow_error("price-level quantity overflow");
         }
 
-        level->second.orders.push_back(std::move(order));
+        level->second.orders.push_back(order);
         const auto inserted_order = std::prev(level->second.orders.end());
 
         try {
